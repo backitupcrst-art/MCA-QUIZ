@@ -960,7 +960,6 @@
     .user-chip-name { max-width: 60px; }
   }
 </style>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -1123,18 +1122,12 @@
       <!-- ALL RECORDS PANEL -->
       <div class="admin-panel" id="apanel-records">
         <div class="admin-stat-row" id="adminRecordStats"></div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:0.6rem;">
-          <button class="btn-ghost-sm" style="font-size:0.68rem;color:var(--teal);border-color:rgba(45,212,191,0.3);" onclick="renderAdminRecords()">↻ Refresh</button>
-        </div>
         <div id="adminRecordsList"></div>
       </div>
 
       <!-- USERS PANEL -->
       <div class="admin-panel" id="apanel-users">
         <div id="adminUsersList"></div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:0.6rem;">
-          <button class="btn-ghost-sm" style="font-size:0.68rem;color:var(--teal);border-color:rgba(45,212,191,0.3);" onclick="renderAdminUsers()">↻ Refresh</button>
-        </div>
       </div>
 
       <!-- EDIT QUESTIONS PANEL -->
@@ -1295,11 +1288,17 @@
     <span><b id="submitAttempted">0</b> of <b id="submitTotal">0</b> questions attempted</span>
     <div class="submit-mini-track"><div class="submit-mini-fill" id="submitFill" style="width:0%"></div></div>
   </div>
-  <div id="submitBarTimer" style="display:none;align-items:center;gap:0.5rem;font-family:'DM Mono',monospace;padding:0.4rem 0.9rem;border-radius:10px;border:1px solid rgba(45,212,191,0.3);background:rgba(45,212,191,0.06);">
-    <span style="font-size:0.65rem;opacity:0.6;">⏱</span>
-    <span id="submitBarTimerText" style="font-size:0.9rem;font-weight:700;color:var(--teal);letter-spacing:0.08em;">00:00</span>
+  <div style="display:flex;align-items:center;gap:0.6rem;flex-shrink:0;">
+    <div id="submitBarTimer" style="display:none;align-items:center;gap:0.5rem;font-family:'DM Mono',monospace;padding:0.4rem 0.9rem;border-radius:10px;border:1px solid rgba(45,212,191,0.3);background:rgba(45,212,191,0.06);cursor:pointer;" onclick="openTimerM()">
+      <span style="font-size:0.65rem;opacity:0.6;">⏱</span>
+      <span id="submitBarTimerText" style="font-size:0.9rem;font-weight:700;color:var(--teal);letter-spacing:0.08em;">00:00</span>
+    </div>
+    <button class="tbtn tbtn-ghost" id="submitBarTimerBtn" onclick="openTimerM()" style="flex-shrink:0;font-size:0.78rem;padding:0.48rem 0.9rem;">
+      <span class="timer-dot" id="submitTimerDot" style="display:none;"></span>
+      <span id="submitTimerText">⏱ Timer</span>
+    </button>
+    <button class="btn-submit" id="submitBtn" onclick="submitQuiz()">Submit Quiz ▶</button>
   </div>
-  <button class="btn-submit" id="submitBtn" onclick="submitQuiz()">Submit Quiz ▶</button>
 </div>
 
 <!-- ══ MODAL: ADD QUESTION ══ -->
@@ -1341,6 +1340,17 @@
       <button class="m-x" onclick="closeM('scriptM')">✕</button>
     </div>
     <div class="m-body">
+      <!-- GAS Web App URL config -->
+      <div id="gasUrlRow" style="margin-bottom:0.9rem;">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
+          <label class="flabel" style="margin:0;">APPS SCRIPT WEB APP URL</label>
+          <span id="gasUrlStatus" style="font-family:'DM Mono',monospace;font-size:0.55rem;padding:0.12rem 0.5rem;border-radius:20px;"></span>
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="gasUrlInput" placeholder="Paste your Web App URL here…" style="flex:1;font-size:0.75rem;" oninput="onGasUrlChange()">
+          <button class="btn-ghost-sm" onclick="saveGasUrl()" style="white-space:nowrap;">Save URL</button>
+        </div>
+      </div>
       <div class="frow">
         <label class="flabel">CATEGORY</label>
         <div style="display:flex;gap:0.5rem;">
@@ -1407,12 +1417,10 @@
 <div class="overlay" id="examsM" onclick="overlayClick(event,'examsM')">
   <div class="modal">
     <div class="m-head">
-      <div class="m-head-txt"><h2>Exam Library</h2><p>ADMIN EXAMS + YOUR SESSION</p></div>
+      <div class="m-head-txt"><h2>Exam Library</h2><p>ALL SAVED EXAMS</p></div>
       <button class="m-x" onclick="closeM('examsM')">✕</button>
     </div>
     <div class="m-body">
-      <!-- Drive sync status bar -->
-      <div id="driveLibStatus" style="display:none;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.45rem 0.8rem;border-radius:8px;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;"></div>
       <div class="cat-tabs">
         <button class="cat-tab active-nav" id="catTab-navigation" onclick="switchCat('navigation')">
           🧭 Navigation <span class="cat-badge" id="catCount-navigation">0</span>
@@ -1424,7 +1432,6 @@
       <div id="examListBody"></div>
     </div>
     <div class="m-foot">
-      <button class="btn-ghost-sm" id="refreshLibBtn" onclick="refreshDriveLibrary()" style="color:var(--teal);border-color:rgba(45,212,191,0.3);">↻ Refresh</button>
       <button class="btn-ghost-sm" onclick="closeM('examsM')">Close</button>
     </div>
   </div>
@@ -1531,36 +1538,81 @@
    re-save the updated file to Drive.
 ════════════════════════════════════ */
 
-// ── Embedded data store ──
+// ── Embedded data store (edit between the markers) ──
 var _STORE = /*DATA_START*/{}/*DATA_END*/;
+
+var _storeDirty = false;
+var _saveDebounce = null;
 
 function _storeGet(key) {
   return key in _STORE ? _STORE[key] : null;
 }
 function _storeSet(key, val) {
   _STORE[key] = val;
+  _scheduleSave();
   return true;
 }
 function _storeDelete(key) {
   delete _STORE[key];
+  _scheduleSave();
 }
 function _storeList(prefix) {
   return Object.keys(_STORE).filter(k => k.startsWith(prefix));
 }
 
-// No-op — auto-download disabled (hosted on GitHub Pages)
-function _scheduleSave() {}
-function _saveToFile() {}
-function _showSaveNotice() {}
+function _scheduleSave() {
+  _storeDirty = true;
+  clearTimeout(_saveDebounce);
+  _saveDebounce = setTimeout(_saveToFile, 1500);
+}
 
-// Compatibility wrappers
+function _saveToFile() {
+  if (!_storeDirty) return;
+  _storeDirty = false;
+  try {
+    // Read current HTML
+    var html = document.documentElement.outerHTML;
+    // Replace the data block
+    var dataStr = JSON.stringify(_STORE);
+    html = html.replace(/\/\*DATA_START\*\/[\s\S]*?\/\*DATA_END\*\//, '/*DATA_START*/' + dataStr + '/*DATA_END*/');
+    // Create download
+    var blob = new Blob([html], { type: 'text/html' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'mca_quiz.html';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
+    _showSaveNotice();
+  } catch(e) {
+    console.warn('Auto-save failed:', e);
+  }
+}
+
+function _showSaveNotice() {
+  var el = document.getElementById('saveNotice');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'saveNotice';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0f1e35;border:1px solid rgba(45,212,191,0.4);color:var(--teal);font-family:DM Mono,monospace;font-size:0.65rem;letter-spacing:0.1em;padding:0.6rem 1.2rem;border-radius:20px;z-index:9999;pointer-events:none;transition:opacity 0.4s;white-space:nowrap;';
+    document.body.appendChild(el);
+  }
+  el.textContent = '✓ FILE SAVED — Replace on Google Drive';
+  el.style.opacity = '1';
+  setTimeout(function() { el.style.opacity = '0'; }, 3500);
+}
+
+// Compatibility wrappers (same API as before)
 function _lsGet(key) { return _storeGet(key); }
 function _lsSet(key, val) { return _storeSet(key, val); }
 function _lsList(prefix) { return _storeList(prefix); }
 
-function storeGet(key, shared=false) { return _storeGet(key); }
-function storeSet(key, val, shared=false) { return _storeSet(key, val); }
-function storeList(prefix, shared=false) { return _storeList(prefix); }
+// Async-safe wrappers — always return Promises so await works correctly
+function storeGet(key, shared=false) { return Promise.resolve(_storeGet(key)); }
+function storeSet(key, val, shared=false) { return Promise.resolve(_storeSet(key, val)); }
+function storeList(prefix, shared=false) { return Promise.resolve(_storeList(prefix)); }
 
 let questions = [
   {
@@ -1866,15 +1918,44 @@ function shuffleOptions(qs) {
 ════════════════════════════════════ */
 var _parsedQuestions = null;
 var _parsedName = '';
-var GAS_URL_HARDCODED = 'https://script.google.com/macros/s/AKfycbzXwU_kgzUAJhXgpA0608OCAa7Vg6cnXTm5pxr5OqdvWyLx5YKGO7zCjLewr1Shvl-HEg/exec';
+var GAS_URL_KEY = 'gas_url';
 
-/* ── GAS URL — hardcoded, no UI needed ── */
-function getGasUrl() { return GAS_URL_HARDCODED; }
-function saveGasUrl() {}
-function onGasUrlChange() {}
-function _updateGasUrlStatus() {}
+/* ── GAS URL management ── */
+function getGasUrl() { return _storeGet(GAS_URL_KEY) || ''; }
+
+function saveGasUrl() {
+  var url = document.getElementById('gasUrlInput').value.trim();
+  if (!url) return;
+  _storeSet(GAS_URL_KEY, url);
+  _updateGasUrlStatus(url);
+}
+
+function onGasUrlChange() {
+  var url = document.getElementById('gasUrlInput').value.trim();
+  _updateGasUrlStatus(url);
+}
+
+function _updateGasUrlStatus(url) {
+  var el = document.getElementById('gasUrlStatus');
+  if (!el) return;
+  if (!url) {
+    el.textContent = 'Not configured';
+    el.style.cssText = 'background:rgba(239,68,68,0.12);color:#f87171;';
+  } else if (url.includes('script.google.com')) {
+    el.textContent = '✓ Connected';
+    el.style.cssText = 'background:rgba(45,212,191,0.12);color:var(--teal);';
+  } else {
+    el.textContent = '⚠ URL looks wrong';
+    el.style.cssText = 'background:rgba(212,168,67,0.12);color:var(--gold);';
+  }
+}
 
 function openScript() {
+  // Prefill saved GAS URL
+  var saved = getGasUrl();
+  var inp = document.getElementById('gasUrlInput');
+  if (inp) { inp.value = saved || ''; _updateGasUrlStatus(saved || ''); }
+  // Reset parse state
   _parsedQuestions = null; _parsedName = '';
   document.getElementById('scriptTA').value = '';
   document.getElementById('scriptName').value = '';
@@ -2074,87 +2155,7 @@ function _syncToGas(callback) {
 }
 
 /* ══════ EXAM LIBRARY ══════ */
-/* ══════ EXAM LIBRARY — DRIVE + SESSION ══════ */
-
-/* driveExams = loaded from Drive (admin's), shown to all
-   exams      = session exams added this session by user   */
-var driveExams = [];
-var _driveLibLoaded = false;
-var _driveLibLoading = false;
-
-/* Called once on login — silently fetch Drive exams in background */
-function loadDriveLibrary(onDone) {
-  if (_driveLibLoading) return;
-  _driveLibLoading = true;
-  var url = getGasUrl();
-  if (!url) { _driveLibLoading = false; if (onDone) onDone(); return; }
-
-  fetch(url + '?action=listExams', { method: 'GET', mode: 'cors' })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    _driveLibLoading = false;
-    _driveLibLoaded = true;
-    if (data.status === 'ok' && Array.isArray(data.exams)) {
-      driveExams = data.exams;
-      // Update badge with combined count
-      var total = driveExams.length + exams.length;
-      var badge = document.getElementById('examBadge');
-      if (badge) badge.textContent = total;
-    }
-    if (onDone) onDone();
-  })
-  .catch(function() {
-    _driveLibLoading = false;
-    if (onDone) onDone();
-  });
-}
-
-/* Manual refresh from library modal */
-function refreshDriveLibrary() {
-  var btn = document.getElementById('refreshLibBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '↻ Loading…'; }
-  _setDriveLibStatus('info', '☁ Fetching latest exams from Drive…');
-  _driveLibLoaded = false;
-  loadDriveLibrary(function() {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
-    if (_driveLibLoaded && driveExams.length) {
-      _setDriveLibStatus('success', '✓ ' + driveExams.length + ' admin exam' + (driveExams.length!==1?'s':'') + ' loaded from Drive');
-    } else {
-      _setDriveLibStatus('warn', '⚠ Could not reach Drive — showing session exams only');
-    }
-    renderExams();
-  });
-}
-
-function _setDriveLibStatus(type, msg) {
-  var el = document.getElementById('driveLibStatus');
-  if (!el) return;
-  el.style.display = 'flex';
-  var styles = {
-    info:    'background:rgba(45,212,191,0.07);color:var(--muted);',
-    success: 'background:rgba(45,212,191,0.1);color:var(--teal);',
-    warn:    'background:rgba(212,168,67,0.1);color:var(--gold);',
-    error:   'background:rgba(239,68,68,0.1);color:#f87171;'
-  };
-  el.style.cssText = el.style.cssText + (styles[type]||styles.info);
-  el.innerHTML = '<span>' + msg + '</span>';
-  setTimeout(function() { if (el) el.style.display = 'none'; }, 5000);
-}
-
-function openExams() {
-  renderExams();
-  openM('examsM');
-  // If not yet loaded, fetch silently
-  if (!_driveLibLoaded && !_driveLibLoading) {
-    _setDriveLibStatus('info', '☁ Loading admin exams from Drive…');
-    loadDriveLibrary(function() {
-      if (_driveLibLoaded && driveExams.length) {
-        _setDriveLibStatus('success', '✓ ' + driveExams.length + ' admin exam' + (driveExams.length!==1?'s':'') + ' loaded');
-      }
-      renderExams();
-    });
-  }
-}
+function openExams() { renderExams(); openM('examsM'); }
 
 function switchCat(cat) {
   activeCategory = cat;
@@ -2166,95 +2167,45 @@ function switchCat(cat) {
 }
 
 function renderExams() {
-  var body = document.getElementById('examListBody');
-
-  // Merge: Drive exams (admin) + session exams, deduplicated by name
-  var merged = [];
-  driveExams.forEach(function(ex) {
-    merged.push(Object.assign({}, ex, { _source: 'drive' }));
-  });
-  exams.forEach(function(ex) {
-    var alreadyInDrive = merged.some(function(d){ return d.name === ex.name; });
-    if (!alreadyInDrive) merged.push(Object.assign({}, ex, { _source: 'session' }));
+  const body = document.getElementById('examListBody');
+  // update counts
+  ['navigation','stability'].forEach(cat => {
+    const n = exams.filter(e => (e.category||'navigation') === cat).length;
+    const el = document.getElementById('catCount-' + cat);
+    if (el) el.textContent = n;
   });
 
-  // Update badge + counts
-  var navCount  = merged.filter(function(e){ return (e.category||'navigation') === 'navigation'; }).length;
-  var stabCount = merged.filter(function(e){ return (e.category||'navigation') === 'stability'; }).length;
-  var navEl  = document.getElementById('catCount-navigation');
-  var stabEl = document.getElementById('catCount-stability');
-  if (navEl)  navEl.textContent  = navCount;
-  if (stabEl) stabEl.textContent = stabCount;
-  var badge = document.getElementById('examBadge');
-  if (badge) badge.textContent = merged.length;
-
-  var filtered = merged.filter(function(e){ return (e.category||'navigation') === activeCategory; });
+  const filtered = exams.map((ex,i) => ({...ex, _i:i})).filter(e => (e.category||'navigation') === activeCategory);
 
   if (!filtered.length) {
-    var label = activeCategory === 'navigation' ? '🧭 Navigation' : '⚖️ Stability';
-    var emptyMsg = _driveLibLoading
-      ? '<div class="exam-empty"><span>' + (activeCategory==='navigation'?'🧭':'⚖️') + '</span>Loading from Drive…</div>'
-      : '<div class="exam-empty"><span>' + (activeCategory==='navigation'?'🧭':'⚖️') + '</span>No ' + label + ' exams yet.<br>Admin can upload via Script Input.</div>';
-    body.innerHTML = emptyMsg;
+    const label = activeCategory === 'navigation' ? '🧭 Navigation' : '⚖️ Stability';
+    body.innerHTML = `<div class="exam-empty"><span>${activeCategory==='navigation'?'🧭':'⚖️'}</span>No ${label} exams yet.<br>Save an exam and assign it to this category.</div>`;
     return;
   }
 
-  var icon = activeCategory === 'navigation' ? '🧭' : '⚖️';
-  var sectionLabel = activeCategory === 'navigation' ? '🧭 Navigation Exams' : '⚖️ Stability Exams';
-
-  body.innerHTML = '<div class="cat-section-label">' + sectionLabel + '</div><div class="exam-list">' +
-    filtered.map(function(ex, idx) {
-      var sourceTag = ex._source === 'drive'
-        ? '<span style="font-size:0.58rem;font-family:DM Mono,monospace;color:var(--teal);background:rgba(45,212,191,0.1);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.4rem;">☁ Admin</span>'
-        : '<span style="font-size:0.58rem;font-family:DM Mono,monospace;color:var(--muted);background:rgba(255,255,255,0.05);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.4rem;">Session</span>';
-      var qCount = ex.questions ? ex.questions.length : (ex.questionCount || '?');
-      var date   = ex.date || (ex.savedAt ? new Date(ex.savedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '');
-      var canDel = ex._source === 'session' || (currentUser && currentUser.isAdmin);
-      return '<div class="exam-item" data-cat="' + activeCategory + '">' +
-        '<div class="exam-icon">' + icon + '</div>' +
-        '<div class="exam-info">' +
-          '<div class="exam-name">' + ex.name + sourceTag + '</div>' +
-          '<div class="exam-meta">' + qCount + ' questions' + (date ? ' · ' + date : '') + '</div>' +
-          (ex.desc ? '<div class="exam-desc">' + ex.desc + '</div>' : '') +
-        '</div>' +
-        '<div class="exam-acts">' +
-          '<button class="btn-load" onclick="loadMergedExam(' + idx + ',\'' + activeCategory + '\')">▶ Load</button>' +
-          (canDel ? '<button class="btn-del-exam" onclick="deleteMergedExam(' + idx + ',\'' + activeCategory + '\')">✕</button>' : '') +
-        '</div>' +
-      '</div>';
-    }).join('') + '</div>';
-
-  // Store merged list for load/delete reference
-  window._mergedExams = filtered;
+  const icon = activeCategory === 'navigation' ? '🧭' : '⚖️';
+  body.innerHTML = `<div class="cat-section-label">${activeCategory === 'navigation' ? '🧭 Navigation Exams' : '⚖️ Stability Exams'}</div>
+  <div class="exam-list">${filtered.map(ex => `
+    <div class="exam-item" data-cat="${activeCategory}">
+      <div class="exam-icon">${icon}</div>
+      <div class="exam-info">
+        <div class="exam-name">${ex.name}</div>
+        <div class="exam-meta">${ex.questions.length} questions · ${ex.date}</div>
+        ${ex.desc ? `<div class="exam-desc">${ex.desc}</div>` : ''}
+      </div>
+      <div class="exam-acts">
+        <button class="btn-load" onclick="loadExam(${ex._i})">▶ Load</button>
+        <button class="btn-del-exam" onclick="deleteExam(${ex._i})">✕</button>
+      </div>
+    </div>
+  `).join('')}</div>`;
 }
 
-function loadMergedExam(filteredIdx) {
-  var ex = window._mergedExams[filteredIdx];
-  if (!ex) return;
-  // Drive exams may not have questions in memory — need to fetch
-  if (!ex.questions || !ex.questions.length) {
-    var body = document.getElementById('examListBody');
-    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.8rem;">☁ Loading questions from Drive…</div>';
-    _fetchDriveExam(ex.name, ex.category, function(fullExam) {
-      if (fullExam && fullExam.questions) {
-        questions = shuffleOptions(JSON.parse(JSON.stringify(fullExam.questions)));
-        activeExamName = fullExam.name;
-        updateBanner(); resetState();
-        closeM('examsM');
-        document.getElementById('scoreWrap').classList.remove('show');
-        document.getElementById('submitBar').classList.remove('show');
-        render();
-        window.scrollTo({top:0,behavior:'smooth'});
-      } else {
-        renderExams();
-        _setDriveLibStatus('error', '✕ Could not load questions — try Refresh');
-      }
-    });
-    return;
-  }
-  questions = shuffleOptions(JSON.parse(JSON.stringify(ex.questions)));
-  activeExamName = ex.name;
-  updateBanner(); resetState();
+function loadExam(i) {
+  questions = shuffleOptions(JSON.parse(JSON.stringify(exams[i].questions)));
+  activeExamName = exams[i].name;
+  updateBanner();
+  resetState();
   closeM('examsM');
   document.getElementById('scoreWrap').classList.remove('show');
   document.getElementById('submitBar').classList.remove('show');
@@ -2262,36 +2213,13 @@ function loadMergedExam(filteredIdx) {
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function deleteMergedExam(filteredIdx) {
-  var ex = window._mergedExams[filteredIdx];
-  if (!ex) return;
-  if (ex._source === 'session') {
-    var si = exams.findIndex(function(e){ return e.name === ex.name; });
-    if (si !== -1) { exams.splice(si, 1); renderExams(); }
-  } else if (currentUser && currentUser.isAdmin) {
-    // Remove from driveExams local cache (Drive file stays — admin can re-upload)
-    var di = driveExams.findIndex(function(e){ return e.name === ex.name; });
-    if (di !== -1) { driveExams.splice(di, 1); renderExams(); }
-  }
+function deleteExam(i) {
+  
+  exams.splice(i,1);
+  document.getElementById('examBadge').textContent = exams.length;
+  _storeSet('exams', exams);
+  renderExams();
 }
-
-/* Fetch full exam (with questions) from Drive by name */
-function _fetchDriveExam(name, category, callback) {
-  var url = getGasUrl();
-  if (!url) { callback(null); return; }
-  fetch(url + '?action=getExam&name=' + encodeURIComponent(name) + '&category=' + encodeURIComponent(category||'navigation'), {
-    method: 'GET', mode: 'cors'
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    callback(data.status === 'ok' ? data.exam : null);
-  })
-  .catch(function(){ callback(null); });
-}
-
-/* Legacy loadExam / deleteExam kept for compatibility */
-function loadExam(i) { loadMergedExam(i); }
-function deleteExam(i) { deleteMergedExam(i); }
 
 /* ══════ SAVE EXAM ══════ */
 function openSaveExam() {
@@ -2378,6 +2306,13 @@ function stopTimer() {
   document.getElementById('timerText').textContent = 'Timer';
   const barTimer = document.getElementById('submitBarTimer');
   if (barTimer) barTimer.style.display = 'none';
+  // Reset submit bar timer button
+  const sbBtn = document.getElementById('submitBarTimerBtn');
+  const sbDot = document.getElementById('submitTimerDot');
+  const sbTxt = document.getElementById('submitTimerText');
+  if (sbBtn) { sbBtn.className = 'tbtn tbtn-ghost'; }
+  if (sbDot) sbDot.style.display = 'none';
+  if (sbTxt) sbTxt.textContent = '⏱ Timer';
   closeM('timerM');
 }
 
@@ -2393,9 +2328,14 @@ function updateTimerDisplay() {
   else if (pct <= 0.25) btn.classList.add('tbtn-timer-warn');
   else btn.classList.add('tbtn-timer-active');
 
-  // Update submit bar clock
+  // Update submit bar clock display (shown when timer running)
   const barTimer = document.getElementById('submitBarTimer');
   const barTimerText = document.getElementById('submitBarTimerText');
+  // Update submit bar timer button
+  const sbTimerBtn = document.getElementById('submitBarTimerBtn');
+  const sbTimerDot = document.getElementById('submitTimerDot');
+  const sbTimerText = document.getElementById('submitTimerText');
+
   if (barTimer && barTimerText) {
     barTimer.style.display = 'flex';
     barTimerText.textContent = fmt;
@@ -2415,6 +2355,16 @@ function updateTimerDisplay() {
       barTimerText.style.color = 'var(--teal)';
       barTimerText.style.animation = 'none';
     }
+  }
+
+  // Sync submit bar timer button appearance
+  if (sbTimerBtn && sbTimerDot && sbTimerText) {
+    sbTimerDot.style.display = 'inline-block';
+    sbTimerText.textContent = fmt;
+    sbTimerBtn.className = 'tbtn';
+    if (pct <= 0.1) sbTimerBtn.classList.add('tbtn-timer-danger');
+    else if (pct <= 0.25) sbTimerBtn.classList.add('tbtn-timer-warn');
+    else sbTimerBtn.classList.add('tbtn-timer-active');
   }
 }
 
@@ -2634,7 +2584,7 @@ let currentUser = null;
 
 const ADMIN_EMAIL    = 'backitup.crst@gmail.com';
 const ADMIN_PASSWORD = 'JasCra@123';
-const GOOGLE_CLIENT_ID = '38456303872-qjq4icvgf7vu32l2au7tfn9cqn194j2q.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '27579080548-49dlgco4mpdtbtve4og9rbpm59sogf76.apps.googleusercontent.com';
 
 /* ── Storage helpers (window.storage with localStorage fallback) ── */
 /* ── Hashing ── */
@@ -2666,24 +2616,9 @@ function parseJwt(token) {
   } catch(_) { return null; }
 }
 
-/* ── Google Identity Services (GIS) ── */
+/* ── Google OAuth2 Popup ── */
 function initGoogleAuth() {
-  if (!GOOGLE_CLIENT_ID) return;
-  var attempt = 0;
-  function tryInit() {
-    attempt++;
-    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-      google.accounts.id.initialize({
-        client_id:  GOOGLE_CLIENT_ID,
-        callback:   handleGoogleCredential,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-    } else if (attempt < 20) {
-      setTimeout(tryInit, 300);
-    }
-  }
-  tryInit();
+  // No GIS library needed — button uses OAuth2 popup directly
 }
 
 function triggerGoogleLogin() {
@@ -2694,84 +2629,93 @@ function triggerGoogleLogin() {
   var btn = document.getElementById('googleSignInBtn');
   if (btn) { btn.disabled = true; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Opening Google…'; }
 
-  if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-    google.accounts.id.prompt(function(notification) {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        _googleTokenFallback(btn);
-      }
-    });
-  } else {
-    _googleTokenFallback(btn);
-  }
-}
+  var redirectUri = window.location.href.split('?')[0].split('#')[0];
+  var state = Math.random().toString(36).slice(2);
+  _STORE['oauth_state'] = state;
 
-function _googleTokenFallback(btn) {
-  if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
-    var client = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: 'openid email profile',
-      callback: function(tokenResponse) {
-        if (tokenResponse.error) {
-          if (btn) { btn.disabled = false; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Sign in with Google'; }
+  var params = new URLSearchParams({
+    client_id:     GOOGLE_CLIENT_ID,
+    redirect_uri:  redirectUri,
+    response_type: 'token',
+    scope:         'openid email profile',
+    state:         state,
+    prompt:        'select_account',
+  });
+
+  var authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  var popup = window.open(authUrl, 'googleLogin',
+    'width=500,height=620,scrollbars=yes,resizable=yes,left=' +
+    (screen.width/2 - 250) + ',top=' + (screen.height/2 - 310));
+
+  if (!popup) {
+    // Popup blocked — fall back to redirect
+    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
+    window.location.href = authUrl;
+    return;
+  }
+
+  // Poll for popup close or token
+  var pollInterval = setInterval(function() {
+    try {
+      if (popup.closed) {
+        clearInterval(pollInterval);
+        if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
+        return;
+      }
+      var hash = popup.location.hash || popup.location.search;
+      if (hash && (hash.includes('access_token') || hash.includes('id_token') || hash.includes('error'))) {
+        clearInterval(pollInterval);
+        var fragment = hash.startsWith('#') ? hash.slice(1) : hash.startsWith('?') ? hash.slice(1) : hash;
+        var result = new URLSearchParams(fragment);
+        popup.close();
+        if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
+        var error = result.get('error');
+        if (error) {
           showAuthErr(document.getElementById('loginErr'), 'Google sign-in cancelled.');
           return;
         }
-        _fetchGoogleUserInfo(tokenResponse.access_token);
-      },
-    });
-    client.requestAccessToken({ prompt: 'select_account' });
-  } else {
-    if (btn) { btn.disabled = false; var t2 = btn.querySelector('.btn-google-text'); if(t2) t2.textContent = 'Sign in with Google'; }
-    showAuthErr(document.getElementById('loginErr'), 'Google library not loaded yet. Please wait a moment and try again.');
-  }
+        var accessToken = result.get('access_token');
+        if (accessToken) { _fetchGoogleUserInfo(accessToken); }
+        else { showAuthErr(document.getElementById('loginErr'), 'Google sign-in failed. Try again.'); }
+      }
+    } catch(e) { /* cross-origin — still waiting */ }
+  }, 300);
 }
 
-/* Called by GIS one-tap with id_token */
-function handleGoogleCredential(response) {
-  if (!response || !response.credential) {
-    showAuthErr(document.getElementById('loginErr'), 'Google sign-in failed.');
-    return;
-  }
-  try {
-    var parts   = response.credential.split('.');
-    var payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
-    _processGoogleUser(payload.email||'', payload.name||'', payload.picture||'');
-  } catch(e) {
-    showAuthErr(document.getElementById('loginErr'), 'Google sign-in error: ' + e.message);
-  }
+function _googleBtnInner() {
+  return '<span class="btn-google-icon"><svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 6.294C4.672 4.169 6.656 3.58 9 3.58z"/></svg></span><span class="btn-google-text">Sign in with Google</span>';
 }
 
 function _fetchGoogleUserInfo(accessToken) {
   var btn = document.getElementById('googleSignInBtn');
-  if (btn) { btn.disabled = true; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Signing in…'; }
+  if (btn) { btn.disabled = true; var t2 = btn.querySelector('.btn-google-text'); if(t2) t2.textContent = 'Signing in…'; }
   fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { 'Authorization': 'Bearer ' + accessToken }
   })
   .then(function(r) { return r.json(); })
   .then(function(info) {
-    if (btn) { btn.disabled = false; var t2 = btn.querySelector('.btn-google-text'); if(t2) t2.textContent = 'Sign in with Google'; }
-    _processGoogleUser(info.email||'', info.name||'', info.picture||'');
+    var email    = info.email || '';
+    var name     = info.name || email.split('@')[0] || 'User';
+    var picture  = info.picture || '';
+    var initials = name.split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2) || 'G';
+    var username = 'google_' + email.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+    var isAdmin  = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    var existing = _storeGet('user:' + username) || {};
+    var account  = Object.assign({}, existing, { username, name, email, initials, picture, provider:'google', isAdmin, lastLogin: new Date().toISOString() });
+    if (!existing.created) account.created = new Date().toISOString();
+    _storeSet('user:' + username, account);
+    var idx = _storeGet('user-index') || [];
+    if (!idx.includes(username)) { idx.push(username); _storeSet('user-index', idx); }
+    currentUser = { username, name, email, initials, picture, isAdmin };
+    _STORE['mca_session'] = currentUser;
+    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
+    onLoginSuccess();
   })
-  .catch(function() {
-    if (btn) { btn.disabled = false; var t3 = btn.querySelector('.btn-google-text'); if(t3) t3.textContent = 'Sign in with Google'; }
+  .catch(function(e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
     showAuthErr(document.getElementById('loginErr'), 'Could not fetch Google profile. Try again.');
+    console.error('Google userinfo error:', e);
   });
-}
-
-function _processGoogleUser(email, name, picture) {
-  if (!email) { showAuthErr(document.getElementById('loginErr'), 'Google sign-in failed — no email returned.'); return; }
-  name = name || email.split('@')[0] || 'User';
-  var initials = name.split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().slice(0,2) || 'G';
-  var username = 'google_' + email.replace(/[^a-z0-9]/gi,'_').toLowerCase();
-  var isAdmin  = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-  var existing = _storeGet('user:' + username) || {};
-  var account  = Object.assign({}, existing, { username:username, name:name, email:email, initials:initials, picture:picture, provider:'google', isAdmin:isAdmin });
-  _storeSet('user:' + username, account);
-  var idx = _storeGet('user-index') || [];
-  if (!idx.includes(username)) { idx.push(username); _storeSet('user-index', idx); }
-  currentUser = { username:username, name:name, email:email, initials:initials, picture:picture, isAdmin:isAdmin };
-  _STORE['mca_session'] = currentUser;
-  onLoginSuccess();
 }
 
 /* ── Init ── */
@@ -2802,7 +2746,26 @@ function enterAsGuest() {
 
 function initAuth() {
   detectSandbox();
-  // Always clear any baked-in session — sessions must not persist in the published file
+  // Check localStorage for a persisted session (so returning users skip login)
+  var savedSession = null;
+  try {
+    var raw = localStorage.getItem('mca_session');
+    if (raw) savedSession = JSON.parse(raw);
+  } catch(_) {}
+
+  if (savedSession && savedSession.username) {
+    // Restore session — skip auth gate entirely
+    currentUser = savedSession;
+    // Sync back into _STORE so rest of app sees it
+    _STORE['mca_session'] = currentUser;
+    // Show admin main panel only for admin; hide it for candidates
+    document.getElementById('adminMainPanel').style.display = currentUser.isAdmin ? 'block' : 'none';
+    setTimeout(initGoogleAuth, 500);
+    onLoginSuccess();
+    return;
+  }
+
+  // No saved session — show login gate
   delete _STORE['mca_session'];
   document.getElementById('authGate').classList.remove('hidden');
   // Show admin login panel on main page
@@ -2841,20 +2804,20 @@ function doRegister() {
   if (user.length < 3) { showAuthErr(err, 'Username must be at least 3 characters.'); return; }
   if (pass.length < 4) { showAuthErr(err, 'Password must be at least 4 characters.'); return; }
   if (pass !== pass2)  { showAuthErr(err, 'Passwords do not match.'); return; }
-  if (storeGet('user:' + user)) { showAuthErr(err, 'Username already taken.'); return; }
+  if (_storeGet('user:' + user)) { showAuthErr(err, 'Username already taken.'); return; }
 
   function genCandidateId() { return 'CM-' + Math.floor(1000 + Math.random() * 9000); }
   let candidateId = genCandidateId();
   let attempt = 0;
-  while (storeGet('cid:' + candidateId) && attempt < 10) { candidateId = genCandidateId(); attempt++; }
+  while (_storeGet('cid:' + candidateId) && attempt < 10) { candidateId = genCandidateId(); attempt++; }
 
   const hash = hashPass(pass);
   const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
   const account = { username: user, name, initials, hash, candidateId, provider:'password', created: new Date().toISOString() };
-  storeSet('user:' + user, account);
-  storeSet('cid:' + candidateId, user);
-  const idx = storeGet('user-index') || [];
-  if (!idx.includes(user)) { idx.push(user); storeSet('user-index', idx); }
+  _storeSet('user:' + user, account);
+  _storeSet('cid:' + candidateId, user);
+  const idx = _storeGet('user-index') || [];
+  if (!idx.includes(user)) { idx.push(user); _storeSet('user-index', idx); }
 
   document.getElementById('regCandidateId').textContent = candidateId;
   document.getElementById('regSuccess').style.display = 'block';
@@ -2967,6 +2930,7 @@ function doLogout() {
   currentUser = null;
   adminUnlocked = false;
   delete _STORE['mca_session'];
+  try { localStorage.removeItem('mca_session'); } catch(_) {}
   document.getElementById('userChip').classList.remove('user-chip-admin','user-chip-google');
   document.getElementById('userChipAv').textContent = '?';
   document.getElementById('userChipName').textContent = 'Guest';
@@ -2998,6 +2962,8 @@ function onLoginSuccess() {
   }
 }
 function _onLoginSuccessInner() {
+  // Persist session to localStorage so returning users are auto-logged in
+  try { localStorage.setItem('mca_session', JSON.stringify(currentUser)); } catch(_) {}
   document.getElementById('authGate').classList.add('hidden');
   document.getElementById('registerInline').style.display = 'none';
   document.getElementById('regSuccess').style.display = 'none';
@@ -3053,13 +3019,6 @@ function _onLoginSuccessInner() {
     }
   }
   render();
-  // Auto-load admin library from Drive in background after login
-  setTimeout(function() {
-    loadDriveLibrary(function() {
-      var badge = document.getElementById('examBadge');
-      if (badge) badge.textContent = driveExams.length + exams.length;
-    });
-  }, 800);
 }
 
 function showAuthErr(el, msg) {
@@ -3075,55 +3034,30 @@ async function saveRecord() {
   if (!currentUser) { return; }
   const right = scores.filter(Boolean).length;
   const total = questions.length;
-  const pct   = Math.round(right / total * 100);
+  const pct = Math.round(right / total * 100);
   const examName = activeExamName || 'Quick Quiz';
-  const now  = new Date();
-  const date = now.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
-  const time = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  const date = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
+  const time = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
   const record = {
-    id:       Date.now(),
-    exam:     examName,
-    score:    right,
-    total:    total,
-    pct:      pct,
-    date:     date,
-    time:     time,
-    savedAt:  now.toISOString(),
-    user:     currentUser.name,
-    username: currentUser.username,
-    email:    currentUser.email || '',
-    candidateId: currentUser.candidateId || '',
-    verdict:  pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : 'Needs Review'
+    id: Date.now(), exam: examName, score: right, total, pct, date, time,
+    user: currentUser.name, verdict: pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : 'Needs Review'
   };
-
-  // Save to local session store
-  const key      = 'records:' + currentUser.username;
-  const existing = (_storeGet(key)) || [];
+  const key = 'records:' + currentUser.username;
+  const existing = (await storeGet(key)) || [];
   existing.unshift(record);
-  _storeSet(key, existing.slice(0, 50));
-
-  // Push to Drive via Apps Script
-  _syncRecordToGas(record);
-
+  const ok = await storeSet(key, existing.slice(0, 50));
+  // Mirror to shared store for admin
+  await storeSet('allrecords:' + currentUser.username + ':' + record.id, record, true);
   const btn = document.getElementById('saveRecordBtn');
-  btn.textContent = '✓ Saved!';
-  btn.style.background = 'linear-gradient(135deg,var(--correct),#16a34a)';
-  setTimeout(() => {
-    btn.textContent = 'Save Record';
-    btn.style.background = 'linear-gradient(135deg,var(--gold),#b8882e)';
-    openExams();
-  }, 1200);
-}
-
-function _syncRecordToGas(record) {
-  var url = getGasUrl();
-  if (!url) return;
-  fetch(url, {
-    method: 'POST',
-    mode:   'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'saveRecord', record: record })
-  }).catch(function() {});  // silent — no-cors gives opaque response
+  if (ok) {
+    btn.textContent = '✓ Saved!';
+    btn.style.background = 'linear-gradient(135deg,var(--correct),#16a34a)';
+    setTimeout(() => {
+      btn.textContent = 'Save Record';
+      btn.style.background = 'linear-gradient(135deg,var(--gold),#b8882e)';
+      openExams(); // Open library for new exam selection
+    }, 1200);
+  }
 }
 
 /* ════════════════════════════════════
@@ -3138,12 +3072,12 @@ async function openRecords() {
 async function renderRecords() {
   const body = document.getElementById('recordsBody');
   body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.8rem;">Loading…</div>';
-  const records = (_storeGet('records:' + currentUser.username)) || [];
+  const records = (await storeGet('records:' + currentUser.username)) || [];
   if (!records.length) {
     body.innerHTML = '<div class="records-empty"><span style="font-size:2rem;display:block;margin-bottom:0.5rem;opacity:0.3;">—</span>No records yet. Complete a quiz and click <b style="color:var(--gold)">Save Record</b>.</div>';
     return;
   }
-  const avg  = Math.round(records.reduce((s,r) => s + r.pct, 0) / records.length);
+  const avg = Math.round(records.reduce((s,r) => s + r.pct, 0) / records.length);
   const best = Math.max(...records.map(r => r.pct));
   body.innerHTML = '<div class="records-summary">'
     + '<div class="summary-stat"><div class="summary-val">' + records.length + '</div><div class="summary-lbl">Attempts</div></div>'
@@ -3166,7 +3100,8 @@ async function renderRecords() {
 }
 
 async function confirmClearRecords() {
-  _storeSet('records:' + currentUser.username, []);
+  
+  await storeSet('records:' + currentUser.username, []);
   await renderRecords();
 }
 
@@ -3260,7 +3195,7 @@ function loadScriptFromStore(i) {
 
 async function deleteScriptFromStore(id) {
   
-  try { /* Drive-only — no local storage needed */ } catch(_) {}
+  try { await window.storage.delete(id, true); } catch(_) {}
   var idx = (await storeGet('script-index', true)) || [];
   await storeSet('script-index', idx.filter(function(k){ return k !== id; }), true);
   await renderScriptStore();
@@ -3270,114 +3205,68 @@ async function renderAdminRecords() {
   var statsEl = document.getElementById('adminRecordStats');
   var listEl  = document.getElementById('adminRecordsList');
   if (!statsEl || !listEl) return;
-  statsEl.innerHTML = '';
-  listEl.innerHTML  = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1.5rem;">☁ Loading records from Drive…</div>';
-
-  var url = getGasUrl();
-  if (!url) {
-    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.84rem;">Apps Script URL not set.</div>';
+  statsEl.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1rem;">Loading...</div>';
+  listEl.innerHTML = statsEl.innerHTML;
+  var keys = await storeList('allrecords:', true);
+  if (!keys.length) {
+    statsEl.innerHTML = '';
+    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.84rem;">No records saved yet.</div>';
     return;
   }
-
-  try {
-    var resp    = await fetch(url + '?action=listRecords', { method:'GET', mode:'cors' });
-    var data    = await resp.json();
-    var records = (data.status === 'ok' && Array.isArray(data.records)) ? data.records : [];
-
-    if (!records.length) {
-      listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.84rem;">No records saved yet. Candidates save records after completing a quiz.</div>';
-      return;
-    }
-
-    records.sort(function(a,b){ return (b.id||0) - (a.id||0); });
-
-    // Unique users who attempted
-    var uniqueUsers = [...new Set(records.map(function(r){ return r.username || r.user; }))].filter(Boolean);
-    var avg    = Math.round(records.reduce(function(s,r){ return s + (r.pct||0); }, 0) / records.length);
-    var best   = Math.max.apply(null, records.map(function(r){ return r.pct||0; }));
-    var passes = records.filter(function(r){ return (r.pct||0) >= 80; }).length;
-
-    statsEl.innerHTML =
-      '<div class="admin-stat"><div class="admin-stat-val">' + uniqueUsers.length + '</div><div class="admin-stat-lbl">Students Tested</div></div>' +
-      '<div class="admin-stat"><div class="admin-stat-val">' + records.length    + '</div><div class="admin-stat-lbl">Total Attempts</div></div>' +
-      '<div class="admin-stat"><div class="admin-stat-val">' + avg + '%'         + '</div><div class="admin-stat-lbl">Avg Score</div></div>' +
-      '<div class="admin-stat"><div class="admin-stat-val">' + passes            + '</div><div class="admin-stat-lbl">Passes (80%+)</div></div>';
-
-    var rows = '';
-    records.forEach(function(r) {
-      var cls  = (r.pct||0) >= 80 ? 'pass' : (r.pct||0) >= 60 ? 'mid' : 'fail';
-      var name = r.user || r.username || 'Unknown';
-      var cid  = r.candidateId ? '<span style="font-size:0.65rem;font-family:DM Mono,monospace;color:var(--muted);"> · ' + r.candidateId + '</span>' : '';
-      rows += '<tr>' +
-        '<td style="font-weight:600;color:var(--white);">' + name + cid + '</td>' +
-        '<td style="color:var(--text);font-size:0.78rem;">' + (r.exam||'—') + '</td>' +
-        '<td class="score-cell ' + cls + '">' + (r.pct||0) + '% <span style="font-size:0.7rem;opacity:0.7;">(' + (r.score||0) + '/' + (r.total||0) + ')</span></td>' +
-        '<td style="font-size:0.72rem;color:var(--muted);">' + (r.date||'') + ' ' + (r.time||'') + '</td>' +
-        '<td style="font-size:0.72rem;color:var(--muted);">' + (r.verdict||'') + '</td>' +
-        '</tr>';
-    });
-    listEl.innerHTML = '<div style="overflow-x:auto;"><table class="admin-users-table"><thead><tr>' +
-      '<th>Student</th><th>Exam</th><th>Score</th><th>Date</th><th>Verdict</th>' +
-      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-
-  } catch(err) {
-    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:#f87171;font-size:0.82rem;">⚠ Could not load records from Drive.<br><span style="font-size:0.72rem;color:var(--muted);">' + err.message + '</span></div>';
-  }
+  var records = (await Promise.all(keys.map(function(k){ return storeGet(k, true); }))).filter(Boolean);
+  records.sort(function(a,b){ return b.id - a.id; });
+  var avg    = Math.round(records.reduce(function(s,r){ return s + r.pct; }, 0) / records.length);
+  var best   = Math.max.apply(null, records.map(function(r){ return r.pct; }));
+  var passes = records.filter(function(r){ return r.pct >= 80; }).length;
+  statsEl.innerHTML =
+    '<div class="admin-stat"><div class="admin-stat-val">' + records.length + '</div><div class="admin-stat-lbl">Total Attempts</div></div>' +
+    '<div class="admin-stat"><div class="admin-stat-val">' + avg + '%</div><div class="admin-stat-lbl">Avg Score</div></div>' +
+    '<div class="admin-stat"><div class="admin-stat-val">' + best + '%</div><div class="admin-stat-lbl">Best Score</div></div>' +
+    '<div class="admin-stat"><div class="admin-stat-val">' + passes + '</div><div class="admin-stat-lbl">Passes (80%+)</div></div>';
+  var rows = '';
+  records.forEach(function(r) {
+    var cls = r.pct >= 80 ? 'pass' : r.pct >= 60 ? 'mid' : 'fail';
+    rows += '<tr>' +
+      '<td>' + (r.user || 'Unknown') + '</td>' +
+      '<td style="color:var(--text)">' + r.exam + '</td>' +
+      '<td class="score-cell ' + cls + '">' + r.pct + '% (' + r.score + '/' + r.total + ')</td>' +
+      '<td style="font-size:0.75rem;">' + r.date + ' ' + r.time + '</td>' +
+      '<td style="color:var(--muted);font-size:0.75rem;">' + r.verdict + '</td>' +
+      '</tr>';
+  });
+  listEl.innerHTML = '<table class="admin-users-table"><thead><tr>' +
+    '<th>User</th><th>Exam</th><th>Score</th><th>Date</th><th>Verdict</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 async function renderAdminUsers() {
   var el = document.getElementById('adminUsersList');
   if (!el) return;
-  el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1.5rem;">☁ Loading user stats from Drive…</div>';
-
-  var url = getGasUrl();
-  if (!url) { el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">Apps Script URL not set.</div>'; return; }
-
-  try {
-    var resp = await fetch(url + '?action=listRecords', { method:'GET', mode:'cors' });
-    var data = await resp.json();
-    var records = (data.status === 'ok' && Array.isArray(data.records)) ? data.records : [];
-
-    if (!records.length) {
-      el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">No student activity yet.</div>';
-      return;
-    }
-
-    // Group by user
-    var userMap = {};
-    records.forEach(function(r) {
-      var key = r.username || r.user || 'unknown';
-      if (!userMap[key]) userMap[key] = { name: r.user||key, username: key, candidateId: r.candidateId||'', email: r.email||'', attempts:0, scores:[], lastDate:'' };
-      userMap[key].attempts++;
-      userMap[key].scores.push(r.pct||0);
-      if (!userMap[key].lastDate || (r.savedAt||'') > userMap[key].lastDate) userMap[key].lastDate = r.savedAt||r.date||'';
-    });
-
-    var users = Object.values(userMap);
-    users.sort(function(a,b){ return b.attempts - a.attempts; });
-
-    var rows = '';
-    users.forEach(function(u) {
-      var avg  = u.scores.length ? Math.round(u.scores.reduce(function(s,v){return s+v;},0)/u.scores.length) : 0;
-      var best = u.scores.length ? Math.max.apply(null,u.scores) : 0;
-      var last = u.lastDate ? (u.lastDate.length > 10 ? new Date(u.lastDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : u.lastDate) : '—';
-      var avCls = avg >= 80 ? 'pass' : avg >= 60 ? 'mid' : 'fail';
-      rows += '<tr>' +
-        '<td style="font-weight:600;color:var(--white);">' + u.name + '</td>' +
-        '<td style="font-family:DM Mono,monospace;font-size:0.7rem;color:var(--muted);">' + (u.candidateId||u.email||'—') + '</td>' +
-        '<td style="text-align:center;">' + u.attempts + '</td>' +
-        '<td class="score-cell ' + avCls + '" style="text-align:center;">' + avg + '%</td>' +
-        '<td style="text-align:center;color:var(--correct);font-weight:600;">' + best + '%</td>' +
-        '<td style="font-size:0.72rem;color:var(--muted);">' + last + '</td>' +
-        '</tr>';
-    });
-    el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-users-table"><thead><tr>' +
-      '<th>Student</th><th>ID / Email</th><th>Attempts</th><th>Avg</th><th>Best</th><th>Last Active</th>' +
-      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
-
-  } catch(err) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#f87171;font-size:0.82rem;">⚠ Could not load from Drive.<br><span style="font-size:0.72rem;color:var(--muted);">' + err.message + '</span></div>';
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1rem;">Loading...</div>';
+  var idx = (await storeGet('user-index', true)) || [];
+  if (!idx.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">No registered users yet.</div>';
+    return;
   }
+  var users = (await Promise.all(idx.map(function(u){ return storeGet('user:' + u); }))).filter(Boolean);
+  var recCounts = await Promise.all(users.map(async function(u) {
+    var r = (await storeGet('records:' + u.username)) || [];
+    return r.length;
+  }));
+  var rows = '';
+  users.forEach(function(u, i) {
+    var joined = u.created ? new Date(u.created).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Unknown';
+    rows += '<tr>' +
+      '<td style="font-weight:600;color:var(--white);">' + u.name + '</td>' +
+      '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:var(--muted);">' + (u.email || '@' + u.username) + '</td>' +
+      '<td style="font-family:\'DM Mono\',monospace;font-size:0.7rem;">' + (u.provider || 'password') + '</td>' +
+      '<td style="font-family:\'DM Mono\',monospace;">' + recCounts[i] + '</td>' +
+      '<td style="font-size:0.72rem;color:var(--muted);">' + joined + '</td>' +
+      '</tr>';
+  });
+  el.innerHTML = '<table class="admin-users-table"><thead><tr>' +
+    '<th>Name</th><th>Username / Email</th><th>Provider</th><th>Records</th><th>Joined</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 function renderAdminQuestions() {
