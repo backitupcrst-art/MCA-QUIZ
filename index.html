@@ -1123,12 +1123,18 @@
       <!-- ALL RECORDS PANEL -->
       <div class="admin-panel" id="apanel-records">
         <div class="admin-stat-row" id="adminRecordStats"></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:0.6rem;">
+          <button class="btn-ghost-sm" style="font-size:0.68rem;color:var(--teal);border-color:rgba(45,212,191,0.3);" onclick="renderAdminRecords()">↻ Refresh</button>
+        </div>
         <div id="adminRecordsList"></div>
       </div>
 
       <!-- USERS PANEL -->
       <div class="admin-panel" id="apanel-users">
         <div id="adminUsersList"></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:0.6rem;">
+          <button class="btn-ghost-sm" style="font-size:0.68rem;color:var(--teal);border-color:rgba(45,212,191,0.3);" onclick="renderAdminUsers()">↻ Refresh</button>
+        </div>
       </div>
 
       <!-- EDIT QUESTIONS PANEL -->
@@ -1860,7 +1866,7 @@ function shuffleOptions(qs) {
 ════════════════════════════════════ */
 var _parsedQuestions = null;
 var _parsedName = '';
-var GAS_URL_HARDCODED = 'https://script.google.com/macros/s/AKfycbxOTS_gUKrFW8-NrxQGSCXuoEOICflYBs-82oSextILwK6fBTM3DTOeAQfeaCB-9Jr_Rw/exec';
+var GAS_URL_HARDCODED = 'https://script.google.com/macros/s/AKfycbzXwU_kgzUAJhXgpA0608OCAa7Vg6cnXTm5pxr5OqdvWyLx5YKGO7zCjLewr1Shvl-HEg/exec';
 
 /* ── GAS URL — hardcoded, no UI needed ── */
 function getGasUrl() { return GAS_URL_HARDCODED; }
@@ -3069,30 +3075,55 @@ async function saveRecord() {
   if (!currentUser) { return; }
   const right = scores.filter(Boolean).length;
   const total = questions.length;
-  const pct = Math.round(right / total * 100);
+  const pct   = Math.round(right / total * 100);
   const examName = activeExamName || 'Quick Quiz';
-  const date = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
-  const time = new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  const now  = new Date();
+  const date = now.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
+  const time = now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
   const record = {
-    id: Date.now(), exam: examName, score: right, total, pct, date, time,
-    user: currentUser.name, verdict: pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : 'Needs Review'
+    id:       Date.now(),
+    exam:     examName,
+    score:    right,
+    total:    total,
+    pct:      pct,
+    date:     date,
+    time:     time,
+    savedAt:  now.toISOString(),
+    user:     currentUser.name,
+    username: currentUser.username,
+    email:    currentUser.email || '',
+    candidateId: currentUser.candidateId || '',
+    verdict:  pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : 'Needs Review'
   };
-  const key = 'records:' + currentUser.username;
-  const existing = (await storeGet(key)) || [];
+
+  // Save to local session store
+  const key      = 'records:' + currentUser.username;
+  const existing = (_storeGet(key)) || [];
   existing.unshift(record);
-  const ok = await storeSet(key, existing.slice(0, 50));
-  // Mirror to shared store for admin
-  await storeSet('allrecords:' + currentUser.username + ':' + record.id, record, true);
+  _storeSet(key, existing.slice(0, 50));
+
+  // Push to Drive via Apps Script
+  _syncRecordToGas(record);
+
   const btn = document.getElementById('saveRecordBtn');
-  if (ok) {
-    btn.textContent = '✓ Saved!';
-    btn.style.background = 'linear-gradient(135deg,var(--correct),#16a34a)';
-    setTimeout(() => {
-      btn.textContent = 'Save Record';
-      btn.style.background = 'linear-gradient(135deg,var(--gold),#b8882e)';
-      openExams(); // Open library for new exam selection
-    }, 1200);
-  }
+  btn.textContent = '✓ Saved!';
+  btn.style.background = 'linear-gradient(135deg,var(--correct),#16a34a)';
+  setTimeout(() => {
+    btn.textContent = 'Save Record';
+    btn.style.background = 'linear-gradient(135deg,var(--gold),#b8882e)';
+    openExams();
+  }, 1200);
+}
+
+function _syncRecordToGas(record) {
+  var url = getGasUrl();
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    mode:   'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'saveRecord', record: record })
+  }).catch(function() {});  // silent — no-cors gives opaque response
 }
 
 /* ════════════════════════════════════
@@ -3107,12 +3138,12 @@ async function openRecords() {
 async function renderRecords() {
   const body = document.getElementById('recordsBody');
   body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.8rem;">Loading…</div>';
-  const records = (await storeGet('records:' + currentUser.username)) || [];
+  const records = (_storeGet('records:' + currentUser.username)) || [];
   if (!records.length) {
     body.innerHTML = '<div class="records-empty"><span style="font-size:2rem;display:block;margin-bottom:0.5rem;opacity:0.3;">—</span>No records yet. Complete a quiz and click <b style="color:var(--gold)">Save Record</b>.</div>';
     return;
   }
-  const avg = Math.round(records.reduce((s,r) => s + r.pct, 0) / records.length);
+  const avg  = Math.round(records.reduce((s,r) => s + r.pct, 0) / records.length);
   const best = Math.max(...records.map(r => r.pct));
   body.innerHTML = '<div class="records-summary">'
     + '<div class="summary-stat"><div class="summary-val">' + records.length + '</div><div class="summary-lbl">Attempts</div></div>'
@@ -3135,8 +3166,7 @@ async function renderRecords() {
 }
 
 async function confirmClearRecords() {
-  
-  await storeSet('records:' + currentUser.username, []);
+  _storeSet('records:' + currentUser.username, []);
   await renderRecords();
 }
 
@@ -3230,7 +3260,7 @@ function loadScriptFromStore(i) {
 
 async function deleteScriptFromStore(id) {
   
-  try { await window.storage.delete(id, true); } catch(_) {}
+  try { /* Drive-only — no local storage needed */ } catch(_) {}
   var idx = (await storeGet('script-index', true)) || [];
   await storeSet('script-index', idx.filter(function(k){ return k !== id; }), true);
   await renderScriptStore();
@@ -3240,68 +3270,114 @@ async function renderAdminRecords() {
   var statsEl = document.getElementById('adminRecordStats');
   var listEl  = document.getElementById('adminRecordsList');
   if (!statsEl || !listEl) return;
-  statsEl.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1rem;">Loading...</div>';
-  listEl.innerHTML = statsEl.innerHTML;
-  var keys = await storeList('allrecords:', true);
-  if (!keys.length) {
-    statsEl.innerHTML = '';
-    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.84rem;">No records saved yet.</div>';
+  statsEl.innerHTML = '';
+  listEl.innerHTML  = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1.5rem;">☁ Loading records from Drive…</div>';
+
+  var url = getGasUrl();
+  if (!url) {
+    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.84rem;">Apps Script URL not set.</div>';
     return;
   }
-  var records = (await Promise.all(keys.map(function(k){ return storeGet(k, true); }))).filter(Boolean);
-  records.sort(function(a,b){ return b.id - a.id; });
-  var avg    = Math.round(records.reduce(function(s,r){ return s + r.pct; }, 0) / records.length);
-  var best   = Math.max.apply(null, records.map(function(r){ return r.pct; }));
-  var passes = records.filter(function(r){ return r.pct >= 80; }).length;
-  statsEl.innerHTML =
-    '<div class="admin-stat"><div class="admin-stat-val">' + records.length + '</div><div class="admin-stat-lbl">Total Attempts</div></div>' +
-    '<div class="admin-stat"><div class="admin-stat-val">' + avg + '%</div><div class="admin-stat-lbl">Avg Score</div></div>' +
-    '<div class="admin-stat"><div class="admin-stat-val">' + best + '%</div><div class="admin-stat-lbl">Best Score</div></div>' +
-    '<div class="admin-stat"><div class="admin-stat-val">' + passes + '</div><div class="admin-stat-lbl">Passes (80%+)</div></div>';
-  var rows = '';
-  records.forEach(function(r) {
-    var cls = r.pct >= 80 ? 'pass' : r.pct >= 60 ? 'mid' : 'fail';
-    rows += '<tr>' +
-      '<td>' + (r.user || 'Unknown') + '</td>' +
-      '<td style="color:var(--text)">' + r.exam + '</td>' +
-      '<td class="score-cell ' + cls + '">' + r.pct + '% (' + r.score + '/' + r.total + ')</td>' +
-      '<td style="font-size:0.75rem;">' + r.date + ' ' + r.time + '</td>' +
-      '<td style="color:var(--muted);font-size:0.75rem;">' + r.verdict + '</td>' +
-      '</tr>';
-  });
-  listEl.innerHTML = '<table class="admin-users-table"><thead><tr>' +
-    '<th>User</th><th>Exam</th><th>Score</th><th>Date</th><th>Verdict</th>' +
-    '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+  try {
+    var resp    = await fetch(url + '?action=listRecords', { method:'GET', mode:'cors' });
+    var data    = await resp.json();
+    var records = (data.status === 'ok' && Array.isArray(data.records)) ? data.records : [];
+
+    if (!records.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.84rem;">No records saved yet. Candidates save records after completing a quiz.</div>';
+      return;
+    }
+
+    records.sort(function(a,b){ return (b.id||0) - (a.id||0); });
+
+    // Unique users who attempted
+    var uniqueUsers = [...new Set(records.map(function(r){ return r.username || r.user; }))].filter(Boolean);
+    var avg    = Math.round(records.reduce(function(s,r){ return s + (r.pct||0); }, 0) / records.length);
+    var best   = Math.max.apply(null, records.map(function(r){ return r.pct||0; }));
+    var passes = records.filter(function(r){ return (r.pct||0) >= 80; }).length;
+
+    statsEl.innerHTML =
+      '<div class="admin-stat"><div class="admin-stat-val">' + uniqueUsers.length + '</div><div class="admin-stat-lbl">Students Tested</div></div>' +
+      '<div class="admin-stat"><div class="admin-stat-val">' + records.length    + '</div><div class="admin-stat-lbl">Total Attempts</div></div>' +
+      '<div class="admin-stat"><div class="admin-stat-val">' + avg + '%'         + '</div><div class="admin-stat-lbl">Avg Score</div></div>' +
+      '<div class="admin-stat"><div class="admin-stat-val">' + passes            + '</div><div class="admin-stat-lbl">Passes (80%+)</div></div>';
+
+    var rows = '';
+    records.forEach(function(r) {
+      var cls  = (r.pct||0) >= 80 ? 'pass' : (r.pct||0) >= 60 ? 'mid' : 'fail';
+      var name = r.user || r.username || 'Unknown';
+      var cid  = r.candidateId ? '<span style="font-size:0.65rem;font-family:DM Mono,monospace;color:var(--muted);"> · ' + r.candidateId + '</span>' : '';
+      rows += '<tr>' +
+        '<td style="font-weight:600;color:var(--white);">' + name + cid + '</td>' +
+        '<td style="color:var(--text);font-size:0.78rem;">' + (r.exam||'—') + '</td>' +
+        '<td class="score-cell ' + cls + '">' + (r.pct||0) + '% <span style="font-size:0.7rem;opacity:0.7;">(' + (r.score||0) + '/' + (r.total||0) + ')</span></td>' +
+        '<td style="font-size:0.72rem;color:var(--muted);">' + (r.date||'') + ' ' + (r.time||'') + '</td>' +
+        '<td style="font-size:0.72rem;color:var(--muted);">' + (r.verdict||'') + '</td>' +
+        '</tr>';
+    });
+    listEl.innerHTML = '<div style="overflow-x:auto;"><table class="admin-users-table"><thead><tr>' +
+      '<th>Student</th><th>Exam</th><th>Score</th><th>Date</th><th>Verdict</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+  } catch(err) {
+    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:#f87171;font-size:0.82rem;">⚠ Could not load records from Drive.<br><span style="font-size:0.72rem;color:var(--muted);">' + err.message + '</span></div>';
+  }
 }
 
 async function renderAdminUsers() {
   var el = document.getElementById('adminUsersList');
   if (!el) return;
-  el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1rem;">Loading...</div>';
-  var idx = (await storeGet('user-index', true)) || [];
-  if (!idx.length) {
-    el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">No registered users yet.</div>';
-    return;
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;text-align:center;padding:1.5rem;">☁ Loading user stats from Drive…</div>';
+
+  var url = getGasUrl();
+  if (!url) { el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">Apps Script URL not set.</div>'; return; }
+
+  try {
+    var resp = await fetch(url + '?action=listRecords', { method:'GET', mode:'cors' });
+    var data = await resp.json();
+    var records = (data.status === 'ok' && Array.isArray(data.records)) ? data.records : [];
+
+    if (!records.length) {
+      el.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);">No student activity yet.</div>';
+      return;
+    }
+
+    // Group by user
+    var userMap = {};
+    records.forEach(function(r) {
+      var key = r.username || r.user || 'unknown';
+      if (!userMap[key]) userMap[key] = { name: r.user||key, username: key, candidateId: r.candidateId||'', email: r.email||'', attempts:0, scores:[], lastDate:'' };
+      userMap[key].attempts++;
+      userMap[key].scores.push(r.pct||0);
+      if (!userMap[key].lastDate || (r.savedAt||'') > userMap[key].lastDate) userMap[key].lastDate = r.savedAt||r.date||'';
+    });
+
+    var users = Object.values(userMap);
+    users.sort(function(a,b){ return b.attempts - a.attempts; });
+
+    var rows = '';
+    users.forEach(function(u) {
+      var avg  = u.scores.length ? Math.round(u.scores.reduce(function(s,v){return s+v;},0)/u.scores.length) : 0;
+      var best = u.scores.length ? Math.max.apply(null,u.scores) : 0;
+      var last = u.lastDate ? (u.lastDate.length > 10 ? new Date(u.lastDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : u.lastDate) : '—';
+      var avCls = avg >= 80 ? 'pass' : avg >= 60 ? 'mid' : 'fail';
+      rows += '<tr>' +
+        '<td style="font-weight:600;color:var(--white);">' + u.name + '</td>' +
+        '<td style="font-family:DM Mono,monospace;font-size:0.7rem;color:var(--muted);">' + (u.candidateId||u.email||'—') + '</td>' +
+        '<td style="text-align:center;">' + u.attempts + '</td>' +
+        '<td class="score-cell ' + avCls + '" style="text-align:center;">' + avg + '%</td>' +
+        '<td style="text-align:center;color:var(--correct);font-weight:600;">' + best + '%</td>' +
+        '<td style="font-size:0.72rem;color:var(--muted);">' + last + '</td>' +
+        '</tr>';
+    });
+    el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-users-table"><thead><tr>' +
+      '<th>Student</th><th>ID / Email</th><th>Attempts</th><th>Avg</th><th>Best</th><th>Last Active</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+  } catch(err) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#f87171;font-size:0.82rem;">⚠ Could not load from Drive.<br><span style="font-size:0.72rem;color:var(--muted);">' + err.message + '</span></div>';
   }
-  var users = (await Promise.all(idx.map(function(u){ return storeGet('user:' + u); }))).filter(Boolean);
-  var recCounts = await Promise.all(users.map(async function(u) {
-    var r = (await storeGet('records:' + u.username)) || [];
-    return r.length;
-  }));
-  var rows = '';
-  users.forEach(function(u, i) {
-    var joined = u.created ? new Date(u.created).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Unknown';
-    rows += '<tr>' +
-      '<td style="font-weight:600;color:var(--white);">' + u.name + '</td>' +
-      '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:var(--muted);">' + (u.email || '@' + u.username) + '</td>' +
-      '<td style="font-family:\'DM Mono\',monospace;font-size:0.7rem;">' + (u.provider || 'password') + '</td>' +
-      '<td style="font-family:\'DM Mono\',monospace;">' + recCounts[i] + '</td>' +
-      '<td style="font-size:0.72rem;color:var(--muted);">' + joined + '</td>' +
-      '</tr>';
-  });
-  el.innerHTML = '<table class="admin-users-table"><thead><tr>' +
-    '<th>Name</th><th>Username / Email</th><th>Provider</th><th>Records</th><th>Joined</th>' +
-    '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 function renderAdminQuestions() {
