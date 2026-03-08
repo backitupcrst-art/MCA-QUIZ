@@ -1025,8 +1025,8 @@
       </div>
       <button class="btn-auth" onclick="doLogin()">Sign In</button>
       <div class="auth-err" id="loginErr"></div>
-      <div id="googleBtnFallback" style="display:none;margin-top:0.5rem;"></div>
-      <!-- Registration success notice (shown after auto-register via Google or admin-created account) -->
+      <div id="googleBtnFallback" style="display:none;"></div>
+      <!-- Hidden — used only to surface Candidate ID after Google auto-registration -->
       <div id="registerInline" style="display:none;">
         <div id="regSuccess" style="display:none;margin-top:1rem;background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.3);border-radius:10px;padding:0.9rem;text-align:center;">
           <div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:var(--teal);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.4rem;">Account Created</div>
@@ -1263,9 +1263,8 @@
     <div class="submit-mini-track"><div class="submit-mini-fill" id="submitFill" style="width:0%"></div></div>
   </div>
   <div style="display:flex;align-items:center;gap:0.6rem;flex-shrink:0;">
-    <!-- Single timer clock: shows "⏱ Timer" when idle, countdown when running -->
-    <div id="submitBarTimer" onclick="openTimerM()" style="display:flex;align-items:center;gap:0.5rem;font-family:'DM Mono',monospace;padding:0.42rem 0.9rem;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);cursor:pointer;transition:all 0.15s;" title="Open Timer">
-      <span style="font-size:0.75rem;opacity:0.55;" id="submitBarTimerIcon">⏱</span>
+    <div id="submitBarTimer" onclick="openTimerM()" title="Set Timer" style="display:flex;align-items:center;gap:0.45rem;font-family:'DM Mono',monospace;padding:0.42rem 0.85rem;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+      <span style="font-size:0.72rem;opacity:0.5;">⏱</span>
       <span id="submitBarTimerText" style="font-size:0.82rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;">Timer</span>
     </div>
     <button class="btn-submit" id="submitBtn" onclick="submitQuiz()">Submit Quiz ▶</button>
@@ -2270,40 +2269,32 @@ function startTimer() {
 
 function stopTimer() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  // Reset submit bar timer clock to idle state
   const barTimer = document.getElementById('submitBarTimer');
   const barTimerText = document.getElementById('submitBarTimerText');
-  if (barTimer && barTimerText) {
-    barTimerText.textContent = 'Timer';
-    barTimerText.style.color = 'var(--muted)';
-    barTimer.style.borderColor = 'var(--border)';
-    barTimer.style.background = 'rgba(255,255,255,0.03)';
-  }
+  if (barTimer) { barTimer.style.borderColor = 'var(--border)'; barTimer.style.background = 'rgba(255,255,255,0.03)'; }
+  if (barTimerText) { barTimerText.textContent = 'Timer'; barTimerText.style.color = 'var(--muted)'; }
   closeM('timerM');
 }
 
 function updateTimerDisplay() {
   const fmt = formatTime(timerSeconds);
   const pct = timerSeconds / (selectedTimerMins * 60);
-
-  // Single submit-bar timer clock
   const barTimer = document.getElementById('submitBarTimer');
   const barTimerText = document.getElementById('submitBarTimerText');
-  if (barTimer && barTimerText) {
-    barTimerText.textContent = fmt;
-    if (pct <= 0.1) {
-      barTimer.style.borderColor = 'rgba(239,68,68,0.5)';
-      barTimer.style.background = 'rgba(239,68,68,0.08)';
-      barTimerText.style.color = 'var(--wrong)';
-    } else if (pct <= 0.25) {
-      barTimer.style.borderColor = 'rgba(212,168,67,0.4)';
-      barTimer.style.background = 'rgba(212,168,67,0.07)';
-      barTimerText.style.color = 'var(--gold)';
-    } else {
-      barTimer.style.borderColor = 'rgba(45,212,191,0.3)';
-      barTimer.style.background = 'rgba(45,212,191,0.06)';
-      barTimerText.style.color = 'var(--teal)';
-    }
+  if (!barTimer || !barTimerText) return;
+  barTimerText.textContent = fmt;
+  if (pct <= 0.1) {
+    barTimer.style.borderColor = 'rgba(239,68,68,0.5)';
+    barTimer.style.background = 'rgba(239,68,68,0.08)';
+    barTimerText.style.color = 'var(--wrong)';
+  } else if (pct <= 0.25) {
+    barTimer.style.borderColor = 'rgba(212,168,67,0.4)';
+    barTimer.style.background = 'rgba(212,168,67,0.07)';
+    barTimerText.style.color = 'var(--gold)';
+  } else {
+    barTimer.style.borderColor = 'rgba(45,212,191,0.3)';
+    barTimer.style.background = 'rgba(45,212,191,0.06)';
+    barTimerText.style.color = 'var(--teal)';
   }
 }
 
@@ -2315,11 +2306,10 @@ function formatTime(s) {
 
 function triggerTimeUp() {
   submitQuiz();
-  // Reset submit bar timer clock
-  const barTimerText = document.getElementById('submitBarTimerText');
-  if (barTimerText) { barTimerText.textContent = 'Timer'; barTimerText.style.color = 'var(--muted)'; }
   const barTimer = document.getElementById('submitBarTimer');
+  const barTimerText = document.getElementById('submitBarTimerText');
   if (barTimer) { barTimer.style.borderColor = 'var(--border)'; barTimer.style.background = 'rgba(255,255,255,0.03)'; }
+  if (barTimerText) { barTimerText.textContent = 'Timer'; barTimerText.style.color = 'var(--muted)'; }
   const usedMins = selectedTimerMins;
   document.querySelector('.timeup-card p').textContent =
     `Your ${usedMins}-minute session has ended. All questions have been auto-submitted for scoring.`;
@@ -2556,10 +2546,25 @@ function parseJwt(token) {
   } catch(_) { return null; }
 }
 
-/* ── Google OAuth2 Popup ── */
-function initGoogleAuth() {
-  // No GIS library needed — button uses OAuth2 popup directly
-}
+/* ── Google OAuth2 — redirect flow ── */
+/*
+  REDIRECT FLOW (no popup):
+  1. User clicks "Sign in with Google" → page redirects to Google consent screen.
+  2. Google redirects back to THIS page with #access_token=... in the URL hash.
+  3. _checkGoogleCallback() (called inside initAuth) reads the hash and signs the user in.
+
+  ONE-TIME SETUP in Google Cloud Console:
+  • APIs & Services → Credentials → your OAuth Client ID
+  • Authorised JavaScript origins: the base URL where this file is served
+    e.g. https://yourdomain.com
+  • Authorised redirect URIs: the EXACT URL of this page
+    e.g. https://yourdomain.com/index.html
+
+  NOTE: file:// URLs are not supported by Google OAuth.
+  Host the file on any web server (GitHub Pages, Netlify, etc.) or local server.
+*/
+
+function initGoogleAuth() { /* redirect flow needs no init */ }
 
 function triggerGoogleLogin() {
   if (!GOOGLE_CLIENT_ID) {
@@ -2567,68 +2572,54 @@ function triggerGoogleLogin() {
     return;
   }
   var btn = document.getElementById('googleSignInBtn');
-  if (btn) { btn.disabled = true; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Opening Google…'; }
+  if (btn) { btn.disabled = true; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Redirecting…'; }
 
-  // Use a minimal relay page hosted on the same origin via a Blob URL
-  // so the redirect_uri is always accessible and cross-origin restrictions don't apply.
-  var relayHtml = '<!DOCTYPE html><html><body><script>' +
-    'var h=location.hash||location.search;' +
-    'if(window.opener){window.opener.postMessage({type:"google_oauth",data:h},"*");}' +
-    'window.close();' +
-    '<\/script></body></html>';
-  var relayBlob = new Blob([relayHtml], {type:'text/html'});
-  var relayUrl = URL.createObjectURL(relayBlob);
-
+  // redirect_uri must exactly match what is registered in Google Cloud Console
+  var redirectUri = window.location.origin + window.location.pathname;
   var state = Math.random().toString(36).slice(2);
-  _STORE['oauth_state'] = state;
+  try { localStorage.setItem('mca_oauth_state', state); } catch(_) {}
 
   var params = new URLSearchParams({
     client_id:     GOOGLE_CLIENT_ID,
-    redirect_uri:  relayUrl,
+    redirect_uri:  redirectUri,
     response_type: 'token',
     scope:         'openid email profile',
     state:         state,
     prompt:        'select_account',
   });
 
-  var authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
-  var popup = window.open(authUrl, 'googleLogin',
-    'width=500,height=620,scrollbars=yes,resizable=yes,left=' +
-    (screen.width/2 - 250) + ',top=' + (screen.height/2 - 310));
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+}
 
-  if (!popup) {
-    URL.revokeObjectURL(relayUrl);
-    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); }
-    showAuthErr(document.getElementById('loginErr'), 'Popup was blocked. Please allow popups for this page and try again.');
-    return;
+/* Checks for a Google token in the URL hash on page load. Returns true if handled. */
+function _checkGoogleCallback() {
+  var hash = window.location.hash;
+  if (!hash || !hash.includes('access_token')) return false;
+
+  // Immediately strip the token from the URL bar (prevents re-processing on refresh)
+  try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch(_) {}
+
+  var p = new URLSearchParams(hash.slice(1));
+  var accessToken = p.get('access_token');
+  var error = p.get('error');
+
+  if (error || !accessToken) {
+    document.getElementById('authGate').classList.remove('hidden');
+    document.getElementById('adminMainPanel').style.display = 'block';
+    setTimeout(function() {
+      showAuthErr(document.getElementById('loginErr'), 'Google sign-in was cancelled or failed.');
+    }, 100);
+    return true;
   }
 
-  // Listen for the postMessage from the relay page
-  function onMessage(e) {
-    if (!e.data || e.data.type !== 'google_oauth') return;
-    window.removeEventListener('message', onMessage);
-    URL.revokeObjectURL(relayUrl);
-    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); }
-    var raw = e.data.data || '';
-    var fragment = raw.startsWith('#') ? raw.slice(1) : raw.startsWith('?') ? raw.slice(1) : raw;
-    var result = new URLSearchParams(fragment);
-    var error = result.get('error');
-    if (error) { showAuthErr(document.getElementById('loginErr'), 'Google sign-in cancelled.'); return; }
-    var accessToken = result.get('access_token');
-    if (accessToken) { _fetchGoogleUserInfo(accessToken); }
-    else { showAuthErr(document.getElementById('loginErr'), 'Google sign-in failed — no token received.'); }
-  }
-  window.addEventListener('message', onMessage);
+  // Show gate briefly with a "Signing in..." state while profile is fetched
+  document.getElementById('authGate').classList.remove('hidden');
+  document.getElementById('adminMainPanel').style.display = 'none';
+  var btn = document.getElementById('googleSignInBtn');
+  if (btn) { btn.disabled = true; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Signing in…'; }
 
-  // Fallback: if popup closes without posting (e.g. user dismisses)
-  var checkClosed = setInterval(function() {
-    if (popup.closed) {
-      clearInterval(checkClosed);
-      window.removeEventListener('message', onMessage);
-      URL.revokeObjectURL(relayUrl);
-      if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); }
-    }
-  }, 500);
+  _fetchGoogleUserInfo(accessToken);
+  return true;
 }
 
 function _googleBtnInner() {
@@ -2695,22 +2686,25 @@ function enterAsGuest() {
 
 function initAuth() {
   detectSandbox();
-  // Check localStorage for a persisted session — auto-login returning users
+
+  // 1. Handle Google OAuth redirect-back (token in URL hash)
+  if (_checkGoogleCallback()) return;
+
+  // 2. Restore persisted session (returning user — skip login gate)
   var savedSession = null;
   try { var raw = localStorage.getItem('mca_session'); if (raw) savedSession = JSON.parse(raw); } catch(_) {}
   if (savedSession && savedSession.username) {
     currentUser = savedSession;
     _STORE['mca_session'] = currentUser;
     document.getElementById('adminMainPanel').style.display = currentUser.isAdmin ? 'block' : 'none';
-    setTimeout(initGoogleAuth, 500);
     onLoginSuccess();
     return;
   }
-  // No saved session — show login gate
+
+  // 3. No session — show login gate
   delete _STORE['mca_session'];
   document.getElementById('authGate').classList.remove('hidden');
   document.getElementById('adminMainPanel').style.display = 'block';
-  setTimeout(initGoogleAuth, 500);
 }
 
 /* ── Tab switch ── */
