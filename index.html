@@ -1401,10 +1401,12 @@
 <div class="overlay" id="examsM" onclick="overlayClick(event,'examsM')">
   <div class="modal">
     <div class="m-head">
-      <div class="m-head-txt"><h2>Exam Library</h2><p>ALL SAVED EXAMS</p></div>
+      <div class="m-head-txt"><h2>Exam Library</h2><p>ADMIN EXAMS + YOUR SESSION</p></div>
       <button class="m-x" onclick="closeM('examsM')">✕</button>
     </div>
     <div class="m-body">
+      <!-- Drive sync status bar -->
+      <div id="driveLibStatus" style="display:none;font-family:'DM Mono',monospace;font-size:0.6rem;padding:0.45rem 0.8rem;border-radius:8px;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;"></div>
       <div class="cat-tabs">
         <button class="cat-tab active-nav" id="catTab-navigation" onclick="switchCat('navigation')">
           🧭 Navigation <span class="cat-badge" id="catCount-navigation">0</span>
@@ -1416,6 +1418,7 @@
       <div id="examListBody"></div>
     </div>
     <div class="m-foot">
+      <button class="btn-ghost-sm" id="refreshLibBtn" onclick="refreshDriveLibrary()" style="color:var(--teal);border-color:rgba(45,212,191,0.3);">↻ Refresh</button>
       <button class="btn-ghost-sm" onclick="closeM('examsM')">Close</button>
     </div>
   </div>
@@ -2065,7 +2068,87 @@ function _syncToGas(callback) {
 }
 
 /* ══════ EXAM LIBRARY ══════ */
-function openExams() { renderExams(); openM('examsM'); }
+/* ══════ EXAM LIBRARY — DRIVE + SESSION ══════ */
+
+/* driveExams = loaded from Drive (admin's), shown to all
+   exams      = session exams added this session by user   */
+var driveExams = [];
+var _driveLibLoaded = false;
+var _driveLibLoading = false;
+
+/* Called once on login — silently fetch Drive exams in background */
+function loadDriveLibrary(onDone) {
+  if (_driveLibLoading) return;
+  _driveLibLoading = true;
+  var url = getGasUrl();
+  if (!url) { _driveLibLoading = false; if (onDone) onDone(); return; }
+
+  fetch(url + '?action=listExams', { method: 'GET', mode: 'cors' })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    _driveLibLoading = false;
+    _driveLibLoaded = true;
+    if (data.status === 'ok' && Array.isArray(data.exams)) {
+      driveExams = data.exams;
+      // Update badge with combined count
+      var total = driveExams.length + exams.length;
+      var badge = document.getElementById('examBadge');
+      if (badge) badge.textContent = total;
+    }
+    if (onDone) onDone();
+  })
+  .catch(function() {
+    _driveLibLoading = false;
+    if (onDone) onDone();
+  });
+}
+
+/* Manual refresh from library modal */
+function refreshDriveLibrary() {
+  var btn = document.getElementById('refreshLibBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Loading…'; }
+  _setDriveLibStatus('info', '☁ Fetching latest exams from Drive…');
+  _driveLibLoaded = false;
+  loadDriveLibrary(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+    if (_driveLibLoaded && driveExams.length) {
+      _setDriveLibStatus('success', '✓ ' + driveExams.length + ' admin exam' + (driveExams.length!==1?'s':'') + ' loaded from Drive');
+    } else {
+      _setDriveLibStatus('warn', '⚠ Could not reach Drive — showing session exams only');
+    }
+    renderExams();
+  });
+}
+
+function _setDriveLibStatus(type, msg) {
+  var el = document.getElementById('driveLibStatus');
+  if (!el) return;
+  el.style.display = 'flex';
+  var styles = {
+    info:    'background:rgba(45,212,191,0.07);color:var(--muted);',
+    success: 'background:rgba(45,212,191,0.1);color:var(--teal);',
+    warn:    'background:rgba(212,168,67,0.1);color:var(--gold);',
+    error:   'background:rgba(239,68,68,0.1);color:#f87171;'
+  };
+  el.style.cssText = el.style.cssText + (styles[type]||styles.info);
+  el.innerHTML = '<span>' + msg + '</span>';
+  setTimeout(function() { if (el) el.style.display = 'none'; }, 5000);
+}
+
+function openExams() {
+  renderExams();
+  openM('examsM');
+  // If not yet loaded, fetch silently
+  if (!_driveLibLoaded && !_driveLibLoading) {
+    _setDriveLibStatus('info', '☁ Loading admin exams from Drive…');
+    loadDriveLibrary(function() {
+      if (_driveLibLoaded && driveExams.length) {
+        _setDriveLibStatus('success', '✓ ' + driveExams.length + ' admin exam' + (driveExams.length!==1?'s':'') + ' loaded');
+      }
+      renderExams();
+    });
+  }
+}
 
 function switchCat(cat) {
   activeCategory = cat;
@@ -2077,45 +2160,95 @@ function switchCat(cat) {
 }
 
 function renderExams() {
-  const body = document.getElementById('examListBody');
-  // update counts
-  ['navigation','stability'].forEach(cat => {
-    const n = exams.filter(e => (e.category||'navigation') === cat).length;
-    const el = document.getElementById('catCount-' + cat);
-    if (el) el.textContent = n;
+  var body = document.getElementById('examListBody');
+
+  // Merge: Drive exams (admin) + session exams, deduplicated by name
+  var merged = [];
+  driveExams.forEach(function(ex) {
+    merged.push(Object.assign({}, ex, { _source: 'drive' }));
+  });
+  exams.forEach(function(ex) {
+    var alreadyInDrive = merged.some(function(d){ return d.name === ex.name; });
+    if (!alreadyInDrive) merged.push(Object.assign({}, ex, { _source: 'session' }));
   });
 
-  const filtered = exams.map((ex,i) => ({...ex, _i:i})).filter(e => (e.category||'navigation') === activeCategory);
+  // Update badge + counts
+  var navCount  = merged.filter(function(e){ return (e.category||'navigation') === 'navigation'; }).length;
+  var stabCount = merged.filter(function(e){ return (e.category||'navigation') === 'stability'; }).length;
+  var navEl  = document.getElementById('catCount-navigation');
+  var stabEl = document.getElementById('catCount-stability');
+  if (navEl)  navEl.textContent  = navCount;
+  if (stabEl) stabEl.textContent = stabCount;
+  var badge = document.getElementById('examBadge');
+  if (badge) badge.textContent = merged.length;
+
+  var filtered = merged.filter(function(e){ return (e.category||'navigation') === activeCategory; });
 
   if (!filtered.length) {
-    const label = activeCategory === 'navigation' ? '🧭 Navigation' : '⚖️ Stability';
-    body.innerHTML = `<div class="exam-empty"><span>${activeCategory==='navigation'?'🧭':'⚖️'}</span>No ${label} exams yet.<br>Save an exam and assign it to this category.</div>`;
+    var label = activeCategory === 'navigation' ? '🧭 Navigation' : '⚖️ Stability';
+    var emptyMsg = _driveLibLoading
+      ? '<div class="exam-empty"><span>' + (activeCategory==='navigation'?'🧭':'⚖️') + '</span>Loading from Drive…</div>'
+      : '<div class="exam-empty"><span>' + (activeCategory==='navigation'?'🧭':'⚖️') + '</span>No ' + label + ' exams yet.<br>Admin can upload via Script Input.</div>';
+    body.innerHTML = emptyMsg;
     return;
   }
 
-  const icon = activeCategory === 'navigation' ? '🧭' : '⚖️';
-  body.innerHTML = `<div class="cat-section-label">${activeCategory === 'navigation' ? '🧭 Navigation Exams' : '⚖️ Stability Exams'}</div>
-  <div class="exam-list">${filtered.map(ex => `
-    <div class="exam-item" data-cat="${activeCategory}">
-      <div class="exam-icon">${icon}</div>
-      <div class="exam-info">
-        <div class="exam-name">${ex.name}</div>
-        <div class="exam-meta">${ex.questions.length} questions · ${ex.date}</div>
-        ${ex.desc ? `<div class="exam-desc">${ex.desc}</div>` : ''}
-      </div>
-      <div class="exam-acts">
-        <button class="btn-load" onclick="loadExam(${ex._i})">▶ Load</button>
-        <button class="btn-del-exam" onclick="deleteExam(${ex._i})">✕</button>
-      </div>
-    </div>
-  `).join('')}</div>`;
+  var icon = activeCategory === 'navigation' ? '🧭' : '⚖️';
+  var sectionLabel = activeCategory === 'navigation' ? '🧭 Navigation Exams' : '⚖️ Stability Exams';
+
+  body.innerHTML = '<div class="cat-section-label">' + sectionLabel + '</div><div class="exam-list">' +
+    filtered.map(function(ex, idx) {
+      var sourceTag = ex._source === 'drive'
+        ? '<span style="font-size:0.58rem;font-family:DM Mono,monospace;color:var(--teal);background:rgba(45,212,191,0.1);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.4rem;">☁ Admin</span>'
+        : '<span style="font-size:0.58rem;font-family:DM Mono,monospace;color:var(--muted);background:rgba(255,255,255,0.05);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.4rem;">Session</span>';
+      var qCount = ex.questions ? ex.questions.length : (ex.questionCount || '?');
+      var date   = ex.date || (ex.savedAt ? new Date(ex.savedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '');
+      var canDel = ex._source === 'session' || (currentUser && currentUser.isAdmin);
+      return '<div class="exam-item" data-cat="' + activeCategory + '">' +
+        '<div class="exam-icon">' + icon + '</div>' +
+        '<div class="exam-info">' +
+          '<div class="exam-name">' + ex.name + sourceTag + '</div>' +
+          '<div class="exam-meta">' + qCount + ' questions' + (date ? ' · ' + date : '') + '</div>' +
+          (ex.desc ? '<div class="exam-desc">' + ex.desc + '</div>' : '') +
+        '</div>' +
+        '<div class="exam-acts">' +
+          '<button class="btn-load" onclick="loadMergedExam(' + idx + ',\'' + activeCategory + '\')">▶ Load</button>' +
+          (canDel ? '<button class="btn-del-exam" onclick="deleteMergedExam(' + idx + ',\'' + activeCategory + '\')">✕</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+
+  // Store merged list for load/delete reference
+  window._mergedExams = filtered;
 }
 
-function loadExam(i) {
-  questions = shuffleOptions(JSON.parse(JSON.stringify(exams[i].questions)));
-  activeExamName = exams[i].name;
-  updateBanner();
-  resetState();
+function loadMergedExam(filteredIdx) {
+  var ex = window._mergedExams[filteredIdx];
+  if (!ex) return;
+  // Drive exams may not have questions in memory — need to fetch
+  if (!ex.questions || !ex.questions.length) {
+    var body = document.getElementById('examListBody');
+    body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.8rem;">☁ Loading questions from Drive…</div>';
+    _fetchDriveExam(ex.name, ex.category, function(fullExam) {
+      if (fullExam && fullExam.questions) {
+        questions = shuffleOptions(JSON.parse(JSON.stringify(fullExam.questions)));
+        activeExamName = fullExam.name;
+        updateBanner(); resetState();
+        closeM('examsM');
+        document.getElementById('scoreWrap').classList.remove('show');
+        document.getElementById('submitBar').classList.remove('show');
+        render();
+        window.scrollTo({top:0,behavior:'smooth'});
+      } else {
+        renderExams();
+        _setDriveLibStatus('error', '✕ Could not load questions — try Refresh');
+      }
+    });
+    return;
+  }
+  questions = shuffleOptions(JSON.parse(JSON.stringify(ex.questions)));
+  activeExamName = ex.name;
+  updateBanner(); resetState();
   closeM('examsM');
   document.getElementById('scoreWrap').classList.remove('show');
   document.getElementById('submitBar').classList.remove('show');
@@ -2123,13 +2256,36 @@ function loadExam(i) {
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function deleteExam(i) {
-  
-  exams.splice(i,1);
-  document.getElementById('examBadge').textContent = exams.length;
-  _storeSet('exams', exams);
-  renderExams();
+function deleteMergedExam(filteredIdx) {
+  var ex = window._mergedExams[filteredIdx];
+  if (!ex) return;
+  if (ex._source === 'session') {
+    var si = exams.findIndex(function(e){ return e.name === ex.name; });
+    if (si !== -1) { exams.splice(si, 1); renderExams(); }
+  } else if (currentUser && currentUser.isAdmin) {
+    // Remove from driveExams local cache (Drive file stays — admin can re-upload)
+    var di = driveExams.findIndex(function(e){ return e.name === ex.name; });
+    if (di !== -1) { driveExams.splice(di, 1); renderExams(); }
+  }
 }
+
+/* Fetch full exam (with questions) from Drive by name */
+function _fetchDriveExam(name, category, callback) {
+  var url = getGasUrl();
+  if (!url) { callback(null); return; }
+  fetch(url + '?action=getExam&name=' + encodeURIComponent(name) + '&category=' + encodeURIComponent(category||'navigation'), {
+    method: 'GET', mode: 'cors'
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    callback(data.status === 'ok' ? data.exam : null);
+  })
+  .catch(function(){ callback(null); });
+}
+
+/* Legacy loadExam / deleteExam kept for compatibility */
+function loadExam(i) { loadMergedExam(i); }
+function deleteExam(i) { deleteMergedExam(i); }
 
 /* ══════ SAVE EXAM ══════ */
 function openSaveExam() {
@@ -2891,6 +3047,13 @@ function _onLoginSuccessInner() {
     }
   }
   render();
+  // Auto-load admin library from Drive in background after login
+  setTimeout(function() {
+    loadDriveLibrary(function() {
+      var badge = document.getElementById('examBadge');
+      if (badge) badge.textContent = driveExams.length + exams.length;
+    });
+  }, 800);
 }
 
 function showAuthErr(el, msg) {
