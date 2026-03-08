@@ -1024,33 +1024,10 @@
         <input type="password" id="loginPass" placeholder="Enter your password" autocomplete="current-password">
       </div>
       <button class="btn-auth" onclick="doLogin()">Sign In</button>
-      <div style="text-align:center;margin-top:0.8rem;">
-        <span style="font-size:0.72rem;color:var(--muted);font-family:'DM Mono',monospace;">No account? </span>
-        <button onclick="document.getElementById('registerInline').style.display = document.getElementById('registerInline').style.display==='none'?'':'none'" style="background:none;border:none;color:var(--teal);font-size:0.72rem;font-family:'DM Mono',monospace;cursor:pointer;text-decoration:underline;">Register here</button>
-      </div>
       <div class="auth-err" id="loginErr"></div>
       <div id="googleBtnFallback" style="display:none;margin-top:0.5rem;"></div>
-      <div id="registerInline" style="display:none;margin-top:1.2rem;padding-top:1.2rem;border-top:1px solid var(--border);">
-        <div style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--teal);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.9rem;">Create Account</div>
-        <div class="auth-field">
-          <label>Full Name</label>
-          <input type="text" id="regName" placeholder="e.g. Jason Crasto">
-        </div>
-        <div class="auth-field">
-          <label>Username</label>
-          <input type="text" id="regUser" placeholder="Choose a username" autocomplete="username">
-        </div>
-        <div class="auth-field">
-          <label>Password</label>
-          <input type="password" id="regPass" placeholder="Choose a password" autocomplete="new-password">
-        </div>
-        <div class="auth-field">
-          <label>Confirm Password</label>
-          <input type="password" id="regPass2" placeholder="Repeat password">
-        </div>
-        <button class="btn-auth" style="background:linear-gradient(135deg,var(--teal),#1aa89a);color:var(--navy);" onclick="doRegister()">Create Account</button>
-        <div class="auth-err" id="registerErr"></div>
-        <!-- Shown after successful registration -->
+      <!-- Registration success notice (shown after auto-register via Google or admin-created account) -->
+      <div id="registerInline" style="display:none;">
         <div id="regSuccess" style="display:none;margin-top:1rem;background:rgba(45,212,191,0.08);border:1px solid rgba(45,212,191,0.3);border-radius:10px;padding:0.9rem;text-align:center;">
           <div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:var(--teal);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:0.4rem;">Account Created</div>
           <div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.6rem;">Your Candidate ID — save this, you can use it to login</div>
@@ -1186,10 +1163,7 @@
   </div>
   <div style="margin-right:auto;"></div>
   <div class="topbar-divider"></div>
-  <button class="tbtn tbtn-ghost" id="timerBtn" onclick="openTimerM()">
-    <span class="timer-dot" id="timerDot" style="display:none;"></span>
-    <span id="timerText">Timer</span>
-  </button>  <button class="tbtn tbtn-ghost" onclick="openExams()">
+  <button class="tbtn tbtn-ghost" onclick="openExams()">
     Library <span class="badge" id="examBadge">0</span>
   </button>
   <button class="tbtn tbtn-teal" id="addQBtn" onclick="openAddQ()" style="display:none;">+ Add Question</button>
@@ -1289,14 +1263,11 @@
     <div class="submit-mini-track"><div class="submit-mini-fill" id="submitFill" style="width:0%"></div></div>
   </div>
   <div style="display:flex;align-items:center;gap:0.6rem;flex-shrink:0;">
-    <div id="submitBarTimer" style="display:none;align-items:center;gap:0.5rem;font-family:'DM Mono',monospace;padding:0.4rem 0.9rem;border-radius:10px;border:1px solid rgba(45,212,191,0.3);background:rgba(45,212,191,0.06);cursor:pointer;" onclick="openTimerM()">
-      <span style="font-size:0.65rem;opacity:0.6;">⏱</span>
-      <span id="submitBarTimerText" style="font-size:0.9rem;font-weight:700;color:var(--teal);letter-spacing:0.08em;">00:00</span>
+    <!-- Single timer clock: shows "⏱ Timer" when idle, countdown when running -->
+    <div id="submitBarTimer" onclick="openTimerM()" style="display:flex;align-items:center;gap:0.5rem;font-family:'DM Mono',monospace;padding:0.42rem 0.9rem;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.03);cursor:pointer;transition:all 0.15s;" title="Open Timer">
+      <span style="font-size:0.75rem;opacity:0.55;" id="submitBarTimerIcon">⏱</span>
+      <span id="submitBarTimerText" style="font-size:0.82rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;">Timer</span>
     </div>
-    <button class="tbtn tbtn-ghost" id="submitBarTimerBtn" onclick="openTimerM()" style="flex-shrink:0;font-size:0.78rem;padding:0.48rem 0.9rem;">
-      <span class="timer-dot" id="submitTimerDot" style="display:none;"></span>
-      <span id="submitTimerText">⏱ Timer</span>
-    </button>
     <button class="btn-submit" id="submitBtn" onclick="submitQuiz()">Submit Quiz ▶</button>
   </div>
 </div>
@@ -1609,7 +1580,6 @@ function _lsGet(key) { return _storeGet(key); }
 function _lsSet(key, val) { return _storeSet(key, val); }
 function _lsList(prefix) { return _storeList(prefix); }
 
-// Async-safe wrappers — always return Promises so await works correctly
 function storeGet(key, shared=false) { return Promise.resolve(_storeGet(key)); }
 function storeSet(key, val, shared=false) { return Promise.resolve(_storeSet(key, val)); }
 function storeList(prefix, shared=false) { return Promise.resolve(_storeList(prefix)); }
@@ -2300,71 +2270,40 @@ function startTimer() {
 
 function stopTimer() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  const btn = document.getElementById('timerBtn');
-  btn.className = 'tbtn tbtn-ghost';
-  document.getElementById('timerDot').style.display = 'none';
-  document.getElementById('timerText').textContent = 'Timer';
+  // Reset submit bar timer clock to idle state
   const barTimer = document.getElementById('submitBarTimer');
-  if (barTimer) barTimer.style.display = 'none';
-  // Reset submit bar timer button
-  const sbBtn = document.getElementById('submitBarTimerBtn');
-  const sbDot = document.getElementById('submitTimerDot');
-  const sbTxt = document.getElementById('submitTimerText');
-  if (sbBtn) { sbBtn.className = 'tbtn tbtn-ghost'; }
-  if (sbDot) sbDot.style.display = 'none';
-  if (sbTxt) sbTxt.textContent = '⏱ Timer';
+  const barTimerText = document.getElementById('submitBarTimerText');
+  if (barTimer && barTimerText) {
+    barTimerText.textContent = 'Timer';
+    barTimerText.style.color = 'var(--muted)';
+    barTimer.style.borderColor = 'var(--border)';
+    barTimer.style.background = 'rgba(255,255,255,0.03)';
+  }
   closeM('timerM');
 }
 
 function updateTimerDisplay() {
   const fmt = formatTime(timerSeconds);
-  const btn = document.getElementById('timerBtn');
-  const dot = document.getElementById('timerDot');
   const pct = timerSeconds / (selectedTimerMins * 60);
-  document.getElementById('timerText').textContent = fmt;
-  dot.style.display = 'inline-block';
-  btn.className = 'tbtn';
-  if (pct <= 0.1) btn.classList.add('tbtn-timer-danger');
-  else if (pct <= 0.25) btn.classList.add('tbtn-timer-warn');
-  else btn.classList.add('tbtn-timer-active');
 
-  // Update submit bar clock display (shown when timer running)
+  // Single submit-bar timer clock
   const barTimer = document.getElementById('submitBarTimer');
   const barTimerText = document.getElementById('submitBarTimerText');
-  // Update submit bar timer button
-  const sbTimerBtn = document.getElementById('submitBarTimerBtn');
-  const sbTimerDot = document.getElementById('submitTimerDot');
-  const sbTimerText = document.getElementById('submitTimerText');
-
   if (barTimer && barTimerText) {
-    barTimer.style.display = 'flex';
     barTimerText.textContent = fmt;
     if (pct <= 0.1) {
       barTimer.style.borderColor = 'rgba(239,68,68,0.5)';
       barTimer.style.background = 'rgba(239,68,68,0.08)';
       barTimerText.style.color = 'var(--wrong)';
-      barTimerText.style.animation = timerSeconds <= 0 ? 'none' : 'pulse 0.8s ease infinite';
     } else if (pct <= 0.25) {
       barTimer.style.borderColor = 'rgba(212,168,67,0.4)';
       barTimer.style.background = 'rgba(212,168,67,0.07)';
       barTimerText.style.color = 'var(--gold)';
-      barTimerText.style.animation = 'none';
     } else {
       barTimer.style.borderColor = 'rgba(45,212,191,0.3)';
       barTimer.style.background = 'rgba(45,212,191,0.06)';
       barTimerText.style.color = 'var(--teal)';
-      barTimerText.style.animation = 'none';
     }
-  }
-
-  // Sync submit bar timer button appearance
-  if (sbTimerBtn && sbTimerDot && sbTimerText) {
-    sbTimerDot.style.display = 'inline-block';
-    sbTimerText.textContent = fmt;
-    sbTimerBtn.className = 'tbtn';
-    if (pct <= 0.1) sbTimerBtn.classList.add('tbtn-timer-danger');
-    else if (pct <= 0.25) sbTimerBtn.classList.add('tbtn-timer-warn');
-    else sbTimerBtn.classList.add('tbtn-timer-active');
   }
 }
 
@@ -2376,10 +2315,11 @@ function formatTime(s) {
 
 function triggerTimeUp() {
   submitQuiz();
-  const btn = document.getElementById('timerBtn');
-  btn.className = 'tbtn tbtn-ghost';
-  document.getElementById('timerDot').style.display = 'none';
-  document.getElementById('timerText').textContent = 'Timer';
+  // Reset submit bar timer clock
+  const barTimerText = document.getElementById('submitBarTimerText');
+  if (barTimerText) { barTimerText.textContent = 'Timer'; barTimerText.style.color = 'var(--muted)'; }
+  const barTimer = document.getElementById('submitBarTimer');
+  if (barTimer) { barTimer.style.borderColor = 'var(--border)'; barTimer.style.background = 'rgba(255,255,255,0.03)'; }
   const usedMins = selectedTimerMins;
   document.querySelector('.timeup-card p').textContent =
     `Your ${usedMins}-minute session has ended. All questions have been auto-submitted for scoring.`;
@@ -2629,13 +2569,22 @@ function triggerGoogleLogin() {
   var btn = document.getElementById('googleSignInBtn');
   if (btn) { btn.disabled = true; var t = btn.querySelector('.btn-google-text'); if(t) t.textContent = 'Opening Google…'; }
 
-  var redirectUri = window.location.href.split('?')[0].split('#')[0];
+  // Use a minimal relay page hosted on the same origin via a Blob URL
+  // so the redirect_uri is always accessible and cross-origin restrictions don't apply.
+  var relayHtml = '<!DOCTYPE html><html><body><script>' +
+    'var h=location.hash||location.search;' +
+    'if(window.opener){window.opener.postMessage({type:"google_oauth",data:h},"*");}' +
+    'window.close();' +
+    '<\/script></body></html>';
+  var relayBlob = new Blob([relayHtml], {type:'text/html'});
+  var relayUrl = URL.createObjectURL(relayBlob);
+
   var state = Math.random().toString(36).slice(2);
   _STORE['oauth_state'] = state;
 
   var params = new URLSearchParams({
     client_id:     GOOGLE_CLIENT_ID,
-    redirect_uri:  redirectUri,
+    redirect_uri:  relayUrl,
     response_type: 'token',
     scope:         'openid email profile',
     state:         state,
@@ -2648,38 +2597,38 @@ function triggerGoogleLogin() {
     (screen.width/2 - 250) + ',top=' + (screen.height/2 - 310));
 
   if (!popup) {
-    // Popup blocked — fall back to redirect
-    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
-    window.location.href = authUrl;
+    URL.revokeObjectURL(relayUrl);
+    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); }
+    showAuthErr(document.getElementById('loginErr'), 'Popup was blocked. Please allow popups for this page and try again.');
     return;
   }
 
-  // Poll for popup close or token
-  var pollInterval = setInterval(function() {
-    try {
-      if (popup.closed) {
-        clearInterval(pollInterval);
-        if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
-        return;
-      }
-      var hash = popup.location.hash || popup.location.search;
-      if (hash && (hash.includes('access_token') || hash.includes('id_token') || hash.includes('error'))) {
-        clearInterval(pollInterval);
-        var fragment = hash.startsWith('#') ? hash.slice(1) : hash.startsWith('?') ? hash.slice(1) : hash;
-        var result = new URLSearchParams(fragment);
-        popup.close();
-        if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); btn.disabled = false; }
-        var error = result.get('error');
-        if (error) {
-          showAuthErr(document.getElementById('loginErr'), 'Google sign-in cancelled.');
-          return;
-        }
-        var accessToken = result.get('access_token');
-        if (accessToken) { _fetchGoogleUserInfo(accessToken); }
-        else { showAuthErr(document.getElementById('loginErr'), 'Google sign-in failed. Try again.'); }
-      }
-    } catch(e) { /* cross-origin — still waiting */ }
-  }, 300);
+  // Listen for the postMessage from the relay page
+  function onMessage(e) {
+    if (!e.data || e.data.type !== 'google_oauth') return;
+    window.removeEventListener('message', onMessage);
+    URL.revokeObjectURL(relayUrl);
+    if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); }
+    var raw = e.data.data || '';
+    var fragment = raw.startsWith('#') ? raw.slice(1) : raw.startsWith('?') ? raw.slice(1) : raw;
+    var result = new URLSearchParams(fragment);
+    var error = result.get('error');
+    if (error) { showAuthErr(document.getElementById('loginErr'), 'Google sign-in cancelled.'); return; }
+    var accessToken = result.get('access_token');
+    if (accessToken) { _fetchGoogleUserInfo(accessToken); }
+    else { showAuthErr(document.getElementById('loginErr'), 'Google sign-in failed — no token received.'); }
+  }
+  window.addEventListener('message', onMessage);
+
+  // Fallback: if popup closes without posting (e.g. user dismisses)
+  var checkClosed = setInterval(function() {
+    if (popup.closed) {
+      clearInterval(checkClosed);
+      window.removeEventListener('message', onMessage);
+      URL.revokeObjectURL(relayUrl);
+      if (btn) { btn.disabled = false; btn.innerHTML = _googleBtnInner(); }
+    }
+  }, 500);
 }
 
 function _googleBtnInner() {
@@ -2746,31 +2695,21 @@ function enterAsGuest() {
 
 function initAuth() {
   detectSandbox();
-  // Check localStorage for a persisted session (so returning users skip login)
+  // Check localStorage for a persisted session — auto-login returning users
   var savedSession = null;
-  try {
-    var raw = localStorage.getItem('mca_session');
-    if (raw) savedSession = JSON.parse(raw);
-  } catch(_) {}
-
+  try { var raw = localStorage.getItem('mca_session'); if (raw) savedSession = JSON.parse(raw); } catch(_) {}
   if (savedSession && savedSession.username) {
-    // Restore session — skip auth gate entirely
     currentUser = savedSession;
-    // Sync back into _STORE so rest of app sees it
     _STORE['mca_session'] = currentUser;
-    // Show admin main panel only for admin; hide it for candidates
     document.getElementById('adminMainPanel').style.display = currentUser.isAdmin ? 'block' : 'none';
     setTimeout(initGoogleAuth, 500);
     onLoginSuccess();
     return;
   }
-
   // No saved session — show login gate
   delete _STORE['mca_session'];
   document.getElementById('authGate').classList.remove('hidden');
-  // Show admin login panel on main page
   document.getElementById('adminMainPanel').style.display = 'block';
-  // Init Google after DOM is ready
   setTimeout(initGoogleAuth, 500);
 }
 
@@ -2962,7 +2901,6 @@ function onLoginSuccess() {
   }
 }
 function _onLoginSuccessInner() {
-  // Persist session to localStorage so returning users are auto-logged in
   try { localStorage.setItem('mca_session', JSON.stringify(currentUser)); } catch(_) {}
   document.getElementById('authGate').classList.add('hidden');
   document.getElementById('registerInline').style.display = 'none';
